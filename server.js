@@ -11,7 +11,6 @@ import { fetchBseSensex } from "./lib/bse.js";
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 3000);
-const ttlMs = Math.max(5_000, Number(process.env.CACHE_TTL_MS || 15_000));
 const pollDefault = Math.max(10, Number(process.env.POLL_SECONDS || 15));
 const store = createStore(path.join(root, "data", "state.json"));
 const bse = { endpoint: process.env.BSE_MARKET_DATA_URL, token: process.env.BSE_MARKET_DATA_TOKEN };
@@ -21,7 +20,6 @@ const settings = {
   profitTargetPct: 25, lossLimitPct: 30, lotSize: Number(process.env.SENSEX_LOT_SIZE || 20)
 };
 let enabled = true, pollTimer = null, busy = false, providerStatus = "not-configured", lastError = "";
-const cache = new Map();
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
@@ -38,24 +36,6 @@ function marketIsOpen(date = new Date()) {
 }
 function dateKey(date = new Date()) { const p=localParts(date); return `${p.year}-${p.month}-${p.day}`; }
 function validIso(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
-async function fetchJson(kind, params = {}) {
-  const template = sources[kind];
-  if (!template) return { status:"unconfigured", message:"No approved provider endpoint configured." };
-  const url = new URL(template);
-  if (url.protocol !== "https:") throw new Error("Provider endpoints must use HTTPS.");
-  for (const [key,value] of Object.entries(params)) if (value !== undefined && value !== null) url.searchParams.set(key,String(value));
-  const key=url.toString(), now=Date.now(), cached=cache.get(key);
-  if(cached && now-cached.at<ttlMs) return {...cached.value,cacheAgeMs:now-cached.at};
-  const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),8000);
-  try {
-    const response=await fetch(url,{headers:{accept:"application/json","user-agent":"FnOPredictor/0.2 (personal research tool)"},signal:controller.signal});
-    if(!response.ok) throw new Error(`Provider returned HTTP ${response.status}`);
-    const data=await response.json();
-    const value={status:"ok",source:url.origin,retrievedAt:new Date().toISOString(),data};
-    cache.set(key,{at:now,value}); return value;
-  } catch(error) { return {status:"error",message:error.name==="AbortError"?"Provider timed out.":error.message}; }
-  finally { clearTimeout(timeout); }
-}
 function learningStats(state) {
   const result={call:{count:0,wins:0},put:{count:0,wins:0}};
   for(const trade of state.trades.filter(t=>t.status==="closed")) {
