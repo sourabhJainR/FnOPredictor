@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {snapshotFeatures,buildResearchSignals,resolveResearchSignals,researchLeaderboard,calibrateProbability,detectMarketEvents,scoreNewsItem} from "../lib/research.js";
+import {snapshotFeatures,buildResearchSignals,resolveResearchSignals,researchLeaderboard,calibrateProbability,detectMarketEvents,scoreNewsItem,evaluateChampionHoldout} from "../lib/research.js";
 
 function history(n=40){return Array.from({length:n},(_,i)=>({timestamp:new Date(Date.UTC(2026,0,1,0,i)).toISOString(),spot:80000+i*10,pcr:1+(i%4)*0.1,avgIv:14,callOi:1000,putOi:1100,callVolume:200,putVolume:250}));}
 test("research strategies emit independent, explainable forecasts after warmup",()=>{const h=history();const signals=buildResearchSignals(h);assert.equal(signals.length,8);assert.ok(signals.every(x=>x.reason&&x.entrySpot>0&&x.horizon===5));});
@@ -29,4 +29,16 @@ test("challenger promotion requires forecast and shadow paper evidence",()=>{
   shadows.push({strategy:"rsi_14",status:"closed",maxRisk:100,realizedPnl:10});
  }
  assert.equal(researchLeaderboard(outcomes,history(),shadows).champion,"rsi_14");
+});
+
+test("adaptive paper selector requires a separate fifteen-trade holdout",()=>{
+ const trades=[];
+ for(let i=0;i<15;i++){
+  const openedAt=new Date(Date.UTC(2026,2,1+i,10)).toISOString();
+  trades.push({strategy:"buy_hold",status:"closed",openedAt,maxRisk:100,realizedPnl:2});
+  trades.push({strategy:"rsi_14",status:"closed",openedAt,maxRisk:100,realizedPnl:8});
+ }
+ const result=evaluateChampionHoldout({strategy:"rsi_14",since:"2026-02-28T00:00:00.000Z"},trades);
+ assert.equal(result.passed,true);
+ assert.ok(result.challenger.returnPct>result.baseline.returnPct);
 });
