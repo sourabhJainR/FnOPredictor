@@ -3,7 +3,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./lib/store.js";
-import { normalizeChain, nearestExpiry, buildSpreadCandidates, evaluateExit } from "./lib/strategy.js";
+import { normalizeChain, buildSpreadCandidates, evaluateExit } from "./lib/strategy.js";
 import { powerStatus, setPowerInhibit, releasePowerInhibit } from "./lib/power.js";
 
 const app = express();
@@ -164,12 +164,13 @@ function stateResponse() {
   return {...state,learning:learningStats(state),monitor:{enabled,providerStatus,lastError,lastPoll:last?.timestamp||null,
     spot:last?.spot||null,expiry:last?.expiry||null,freshness:age<=30000?"Fresh":age<=120000?"Aging":last?"Stale":"No data",
     marketOpen:marketIsOpen(),capital:settings.capital,riskLimit:settings.riskLimit,profitTargetPct:settings.profitTargetPct,
-    lossLimitPct:settings.lossLimitPct,power:powerStatus(),predictions:state.predictions.slice(-1)[0]||null}};
+    lossLimitPct:settings.lossLimitPct,power:powerStatus(),
+    predictions:age<=120000&&["connected","outside-market-hours","monitoring-stopped"].includes(providerStatus)?(state.predictions.slice(-1)[0]||null):null}};
 }
 
 app.get("/api/monitor/state",(_req,res)=>res.json(stateResponse()));
 app.post("/api/monitor/start",(_req,res)=>{enabled=true;schedulePoll();pollOnce();res.json({enabled});});
-app.post("/api/monitor/stop",(_req,res)=>{enabled=false;if(pollTimer)clearInterval(pollTimer);res.json({enabled});});
+app.post("/api/monitor/stop",(_req,res)=>{enabled=false;res.json({enabled});});
 app.post("/api/monitor/poll",async(_req,res)=>{await pollOnce();res.json(stateResponse());});
 app.post("/api/monitor/settings", (req,res)=>{
   const b=req.body||{};
@@ -195,6 +196,6 @@ await store.init();
 setPowerInhibit(true);
 schedulePoll();
 pollOnce();
-const server=app.listen(port,()=>console.log(`FnOPredictor monitoring at http://localhost:${port}`));
+const server=app.listen(port,"127.0.0.1",()=>console.log(`FnOPredictor monitoring at http://localhost:${port}`));
 function shutdown(){if(pollTimer)clearInterval(pollTimer);releasePowerInhibit();server.close(()=>process.exit(0));}
 process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
