@@ -88,6 +88,8 @@ async function closeTrade(trade,result,chain) {
     current.status="closed";current.closedAt=closedAt;current.exitCredit=result.credit;
     current.realizedPnl=result.pnl;current.exitReason=result.reason;
     current.exitSpot=chain.spot;current.exitTimestamp=chain.timestamp;
+    const prediction=s.predictions.find(p=>p.timestamp===current.predictionTimestamp);
+    if(prediction){prediction.outcome=result.pnl>0?"win":result.pnl<0?"loss":"flat";prediction.realizedPnl=result.pnl;prediction.exitReason=result.reason;}
   });
 }
 async function pollOnce() {
@@ -159,7 +161,7 @@ async function pollOnce() {
           const trade={id:`paper-${Date.now()}`,side:best.side,longStrike:best.long.strike,shortStrike:best.short.strike,
             longType:best.long.type,shortType:best.short.type,entryDebit:best.debit,lotSize:lot,quantity:best.quantity,
             maxLoss:best.risk,openedAt:new Date().toISOString(),entrySpot:chain.spot,expiry:selected,
-            profitTargetPct:settings.profitTargetPct,lossLimitPct:settings.lossLimitPct,status:"open"};
+            profitTargetPct:settings.profitTargetPct,lossLimitPct:settings.lossLimitPct,predictionTimestamp:timestamp,status:"open"};
           await store.transact(s=>{s.trades.push(trade);s.lastTradeDate=today;s.trades=s.trades.slice(-2000);});
         }
       }
