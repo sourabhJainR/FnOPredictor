@@ -1,89 +1,108 @@
-# Market data providers and monitoring
+# Market data provider
 
-## Live data is a required dependency
+## Primary provider: Upstox Developer API
 
-The monitor does not scrape the BSE page or bypass browser protections. Configure approved HTTPS JSON endpoints for a BSE SENSEX quote and a SENSEX option chain. Confirm the provider's exchange licensing, personal-use terms and rate limits.
+FnOPredictor now has a native Upstox adapter for BSE SENSEX. Upstox states that its trading and market-data APIs are free to use. Access requires an Upstox account, an API app and a valid bearer token. The token is stored locally in .env; it is never sent to the browser or written to the trade ledger.
 
-References:
-- BSE option chain: https://www.bseindia.com/markets/derivatives/derireports/derioptionchain
-- BSE market-data products: https://marketdata.bseindia.com/
-- SEBI equity-derivatives directory: https://www.sebi.gov.in/curation/equity_derivatives.html
+Official references:
+- API pricing and free access: https://upstox.com/trading-api/
+- Option chain endpoint: https://upstox.com/developer/api-documentation/get-pc-option-chain/
+- Option contract and weekly-expiry metadata: https://upstox.com/developer/api-documentation/get-option-contracts/
+- Instrument key reference: https://upstox.com/developer/api-documentation/instruments/
+- Authentication: https://upstox.com/developer/api-documentation/getting-started/
 
-## Environment
+### Data mapping
 
-- `BSE_QUOTE_JSON_URL`: quote endpoint; receives `symbol=SENSEX`.
-- `BSE_OPTION_CHAIN_JSON_URL`: chain endpoint; receives `symbol=SENSEX&expiry=nearest-weekly`.
-- `CACHE_TTL_MS`: cache duration, default 15000.
-- `POLL_SECONDS`: monitor poll interval, default 15 (10–60 seconds).
-- `CAPITAL_INR`: default 10000.
-- `RISK_LIMIT_INR`: maximum paper risk, capped at 2000.
-- `SENSEX_LOT_SIZE`: fallback lot size if the provider omits it; default 20 based on the configured research assumption. Prefer the current lot size returned by the provider.
+The adapter uses the BSE index instrument key BSE_INDEX|SENSEX.
 
-## Required provider response
+1. Calls GET /v2/option/contract?instrument_key=BSE_INDEX%7CSENSEX&expiry_date=current_week.
+2. Requires returned contracts to identify BSE_FO, the SENSEX underlying, weekly=true, and a consistent lot size. It selects the earliest unexpired weekly expiry.
+3. Calls GET /v2/option/chain?instrument_key=BSE_INDEX%7CSENSEX&expiry_date=YYYY-MM-DD.
+4. Maps each strike's call and put legs into the app's normalized JSON format:
+   - strike_price → strike
+   - market_data.bid_price / ask_price → executable bid / ask
+   - market_data.ltp → ltp
+   - market_data.oi, volume → oi, volume
+   - option_greeks.iv → iv
+   - underlying_spot_price → SENSEX spot
+   - contract lot_size → lot size
 
-Quote endpoint JSON:
+The option-chain endpoint returns the SENSEX spot and option quotes in one response, so the adapter does not mix spot values from a different provider.
 
-```json
-{
-  "spot": 81500.25,
-  "timestamp": "2026-11-16T10:05:00+05:30"
-}
-```
+**Timestamp note:** the documented option-chain response does not expose a per-snapshot exchange timestamp. The adapter records the local retrieval time and labels it retrieved_at. This confirms when the app fetched the snapshot, not the exchange's original quote timestamp. The monitor also requires valid bid/ask values; stale or missing quotes suppress recommendations. Do not interpret the retrieval timestamp as an exchange timestamp.
 
-Option-chain endpoint JSON must represent the **nearest weekly expiry only** and return:
+### Configure Upstox
 
-```json
-{
-  "spot": 81500.25,
-  "timestamp": "2026-11-16T10:05:00+05:30",
-  "source": "Approved provider",
-  "lotSize": 20,
-  "expiry": "2026-11-17",
-  "expiryType": "weekly",
-  "weeklyExpiries": ["2026-11-17", "2026-11-24"],
-  "options": [
-    {"strike":81500,"type":"CE","bid":180,"ask":182,"ltp":181,"oi":12000,"volume":800,"iv":15.2},
-    {"strike":81500,"type":"PE","bid":175,"ask":177,"ltp":176,"oi":13000,"volume":900,"iv":15.5}
-  ]
-}
-```
+1. Create or use an Upstox account.
+2. Register an API app in the Upstox developer console and generate a market-data access token.
+3. Copy .env.example to .env and set:
 
-Every option must include executable bid and ask quotes. The monitor suppresses recommendations unless:
-- The snapshot timestamp is valid and no older than two minutes.
-- The provider identifies the selected expiry as `weekly`.
-- `expiry` equals the earliest non-expired item in `weeklyExpiries`.
-- At least four contracts have valid bid/ask values.
-- The current lot size is known from provider or local configuration.
+    UPSTOX_ACCESS_TOKEN=your_token_here
+    UPSTOX_INSTRUMENT_KEY=BSE_INDEX|SENSEX
+    POLL_SECONDS=15
 
-The provider must return a fresh chain for the requested expiry on every poll. If its API uses a different response shape, write a provider adapter rather than adding scraping or undocumented endpoint assumptions.
+4. Run npm start.
 
-## Monitoring behaviour
+The app uses current_week on each polling cycle, so the expiry rolls forward automatically. The server keeps the token in its environment and calls Upstox directly. Never commit .env, paste the token into the dashboard, or share it in chat. The repository ignores local environment files.
 
-- Polls during the BSE weekday session, 09:15–15:30 Asia/Kolkata. Exchange holidays are not bundled; provider errors and missing quotes remain visible.
+Upstox says its APIs are free, but account eligibility, authentication, API access and exchange-data terms still apply. A valid token is required; this is not an anonymous public feed.
+
+## Optional custom provider
+
+If Upstox is not configured, the application can use approved HTTPS JSON endpoints:
+- BSE_QUOTE_JSON_URL: receives symbol=SENSEX.
+- BSE_OPTION_CHAIN_JSON_URL: receives symbol=SENSEX&expiry=nearest-weekly.
+
+Do not use undocumented endpoints or scrape around exchange access controls. Confirm the provider's data licence, personal-use terms and rate limits.
+
+## Provider response contract
+
+Quote endpoint:
+
+    {
+      "spot": 81500.25,
+      "timestamp": "2026-11-16T10:05:00+05:30"
+    }
+
+Option-chain endpoint:
+
+    {
+      "spot": 81500.25,
+      "timestamp": "2026-11-16T10:05:00+05:30",
+      "source": "Approved provider",
+      "lotSize": 20,
+      "expiry": "2026-11-17",
+      "expiryType": "weekly",
+      "weeklyExpiries": ["2026-11-17"],
+      "options": [
+        {"strike":81500,"type":"CE","bid":180,"ask":182,"ltp":181,"oi":12000,"volume":800,"iv":15.2},
+        {"strike":81500,"type":"PE","bid":175,"ask":177,"ltp":176,"oi":13000,"volume":900,"iv":15.5}
+      ]
+    }
+
+## Other free sources considered
+
+- indiaopt / BSE public-site wrappers: useful for research and EOD/option-chain inspection, but unofficial, subject to website changes and rate limits. The documented sample data focuses on LTP, OI, volume and IV; it does not establish executable bid/ask coverage. It is not used for paper fills.
+- Nubra: documents BSE option-chain snapshots and real-time streams, but requires an authenticated session. Its REST option-chain sample does not include bid/ask fields in the example response; order-book data is a separate feed. Free eligibility was not established, so it is not the default.
+- BSE official market-data products: BSE lists real-time, delayed, EOD and historical feeds. Confirm the current licence and tariff directly with BSE before using an official data feed.
+
+## Monitoring and safeguards
+
+- Polls during BSE weekday session, 09:15–15:30 Asia/Kolkata.
+- Poll interval defaults to 15 seconds and can be adjusted in the dashboard.
 - Evaluates the best call debit spread and put debit spread independently.
-- Simulates at most one paper position per day, selecting the higher-ranked side. No real order is placed.
-- One position at a time; maximum debit risk is the lower of configured capital and risk limit (hard cap ₹2,000).
-- Default exit: book at +25% of entry debit, cut at -30%, or time exit at 15:20 IST.
-- Closing values use long-leg bid less short-leg ask. If exit quotes are missing, the position remains open and no result is fabricated.
-- Paper outcomes calibrate the side-specific ranking score only after 20 closed trades. This is a small bounded adjustment, not a proven predictive model.
-- State is stored in `data/state.json`; daily HTML reports are written to `reports/YYYY-MM-DD.html`.
+- Simulates at most one paper position per day. No real order is placed.
+- Maximum debit risk is capped at ₹2,000.
+- Default exit: +25% of entry debit, -30%, or 15:20 IST.
+- Entry uses long ask and short bid. Exit uses long bid and short ask.
+- If quotes are missing, crossed or invalid, no recommendation or fabricated P&L is produced.
+- Daily HTML reports are written to reports/YYYY-MM-DD.html.
 
 ## Keep the laptop awake
 
 The server requests an OS sleep inhibitor automatically on startup and releases it on shutdown:
-- Windows: `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)`.
-- macOS: `caffeinate`.
-- Linux: `systemd-inhibit`.
+- Windows: SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED).
+- macOS: caffeinate.
+- Linux: systemd-inhibit.
 
-This prevents automatic system sleep while the server is running. The display may still turn off, and OS policy can still lock the screen. Stopping the server or shutting down the process releases the inhibitor. The dashboard has a control to toggle it manually.
-
-## Run locally
-
-```sh
-npm install
-cp .env.example .env
-# Set both approved provider endpoints in .env
-npm start
-```
-
-Open http://localhost:3000. Keep the server process running for continuous monitoring. State and reports remain on the local machine.
+This prevents automatic system sleep while the server runs. The display may still turn off, and OS policy can still lock the screen.
