@@ -72,7 +72,7 @@ test("exit engine books profit at configured debit return",()=>{
 test("exit engine applies time exit at 15:20 IST",()=>{
   const chain=sampleChain();
   const trade={side:"call",longStrike:100,shortStrike:110,longType:"CE",shortType:"CE",entryDebit:5,lotSize:20,quantity:1};
-  const outcome=evaluateExit(trade,chain,new Date("2026-11-16T09:50:00+05:30"));
+  const outcome=evaluateExit(trade,chain,new Date("2026-11-16T15:20:00+05:30"));
   assert.equal(outcome.action,"close");
   assert.equal(outcome.reason,"15:20 IST time exit");
 });
