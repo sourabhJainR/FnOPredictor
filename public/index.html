@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827"><meta name="description" content="BSE options spread research and risk analysis">
+  <title>FnOPredictor | BSE Options Research</title><link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">FnO<span>Predictor</span></a><div class="top-meta"><span id="connection" class="pill muted">Checking data feeds</span><span class="market-label">BSE DERIVATIVES</span></div></header>
+<main class="shell">
+  <section class="intro"><div><p class="eyebrow">OPTIONS STRATEGY WORKSPACE</p><h1>Find defined-risk spread opportunities.</h1><p class="sub">Live market inputs, transparent payoff maths and explainable model scores.</p></div><a class="source-link" href="https://www.bseindia.com/markets/Derivatives/DeriReports/DeriOptionchain.html" target="_blank" rel="noreferrer">BSE option chain ↗</a></section>
+  <section class="controls panel">
+    <label>Underlying symbol<input id="symbol" value="SENSEX" maxlength="30" autocomplete="off"></label>
+    <label>Expiry date<input id="expiry" type="date"></label>
+    <label>Lot size<input id="lot" type="number" min="1" value="20"></label>
+    <label>Risk budget (₹)<input id="budget" type="number" min="1" value="10000"></label>
+    <button id="refresh" class="primary">Refresh market data</button>
+  </section>
+  <div id="status" class="notice">Market data is not connected. Configure an approved JSON feed or load a chain snapshot.</div>
+  <section class="metrics" id="marketMetrics">
+    <article class="metric panel"><span>Underlying</span><strong id="spot">—</strong><small id="quoteStamp">No quote</small></article>
+    <article class="metric panel"><span>Market bias</span><strong id="bias">—</strong><small id="biasDetail">Awaiting option chain</small></article>
+    <article class="metric panel"><span>Put / Call OI ratio</span><strong id="pcr">—</strong><small>Calculated from loaded chain</small></article>
+    <article class="metric panel"><span>Data freshness</span><strong id="freshness">—</strong><small id="chainStamp">No chain snapshot</small></article>
+  </section>
+  <section class="panel upload-panel">
+    <div><h2>Load option-chain snapshot</h2><p>Use a permitted provider feed or paste normalized JSON. Manual snapshots are never labelled live.</p></div>
+    <div class="upload-actions"><input id="chainFile" type="file" accept=".json,application/json"><button id="loadSample" class="secondary">Load sample data</button></div>
+    <details><summary>Expected JSON format</summary><pre>{"spot": 80000, "timestamp": "2026-11-15T09:30:00+05:30", "source": "provider name", "expiry": "2026-11-26", "options": [{"strike":80000,"type":"CE","bid":120,"ask":125,"ltp":123,"oi":12000,"volume":800,"iv":14},{"strike":80000,"type":"PE","bid":110,"ask":115,"ltp":112,"oi":10000,"volume":700,"iv":15}]}</pre></details>
+  </section>
+  <section class="section-head"><div><p class="eyebrow">MODEL OUTPUT</p><h2>Spread recommendations</h2></div><span id="modelState" class="pill muted">Waiting for data</span></section>
+  <div id="recommendations" class="recommendations"><div class="empty panel">Connect a market feed or load a snapshot to calculate spreads.</div></div>
+  <section class="panel methodology"><h2>How the score works</h2><p>The confidence score is a heuristic ranking score, not a calibrated probability of profit. It combines directional bias from put/call open interest, option liquidity, spread cost and implied volatility. It is not a backtested win rate.</p><p>Payoff estimates use executable-side quotes where available (ask to buy, bid to sell). If only LTP is available, the result is marked indicative. Brokerage, taxes, slippage and partial fills are excluded.</p></section>
+  <footer>For research only. No order placement. Options can lose the full debit paid; review liquidity and contract specifications before trading.</footer>
+</main>
+<script type="module" src="/app.js"></script>
+</body></html>
