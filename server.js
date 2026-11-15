@@ -7,6 +7,8 @@ import { createStore } from "./lib/store.js";
 import { normalizeChain, buildSpreadCandidates, evaluateExit } from "./lib/strategy.js";
 import { powerStatus, setPowerInhibit, releasePowerInhibit } from "./lib/power.js";
 import { fetchUpstoxSensex } from "./lib/upstox.js";
+import { snapshotFeatures } from "./lib/research.js";
+import { startResearchRuntime } from "./lib/research-runtime.js";
 
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -181,7 +183,7 @@ async function pollOnce() {
       }
     }
     providerStatus="connected";lastError="";
-    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp"};});
+    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp",features:snapshotFeatures(chain,timestamp)};});
   } catch(error) { providerStatus="error";lastError=error.message; }
   finally { busy=false; }
 }
@@ -221,9 +223,10 @@ app.get("/api/status",(_req,res)=>res.json({app:"FnOPredictor",providers:{primar
 app.use(async(_req,res)=>{try{res.type("html").send(await readFile(path.join(root,"public","index.html")));}catch{res.status(404).send("Application assets not found.");}});
 
 await store.init();
+const researchRuntime=startResearchRuntime({app,store});
 setPowerInhibit(true);
 schedulePoll();
 pollOnce();
 const server=app.listen(port,"127.0.0.1",()=>console.log(`FnOPredictor monitoring at http://localhost:${port}`));
-function shutdown(){if(pollTimer)clearInterval(pollTimer);releasePowerInhibit();server.close(()=>process.exit(0));}
+function shutdown(){if(pollTimer)clearInterval(pollTimer);researchRuntime.stop();releasePowerInhibit();server.close(()=>process.exit(0));}
 process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
