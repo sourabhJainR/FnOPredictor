@@ -9,7 +9,7 @@ Official references:
 - Option chain endpoint: https://upstox.com/developer/api-documentation/get-pc-option-chain/
 - Option contract and weekly-expiry metadata: https://upstox.com/developer/api-documentation/get-option-contracts/
 - Instrument key reference: https://upstox.com/developer/api-documentation/instruments/
-- Authentication: https://upstox.com/developer/api-documentation/getting-started/
+- Analytics Token setup: https://upstox.com/developer/api-documentation/analytics-token/
 
 ### Data mapping
 
@@ -34,7 +34,7 @@ The option-chain endpoint returns the SENSEX spot and option quotes in one respo
 ### Configure Upstox
 
 1. Create or use an Upstox account.
-2. Register an API app in the Upstox developer console and generate a market-data access token.
+2. Open the Upstox Developer Apps page, select the Analytics tab and generate an Analytics Token. It is free, read-only, valid for one year, and supports the Option Chain API without a static IP. It cannot place or modify orders.
 3. Copy .env.example to .env and set:
 
     UPSTOX_ACCESS_TOKEN=your_token_here
