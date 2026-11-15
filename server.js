@@ -7,6 +7,8 @@ import { createStore } from "./lib/store.js";
 import { normalizeChain, buildSpreadCandidates, evaluateExit } from "./lib/strategy.js";
 import { powerStatus, setPowerInhibit, releasePowerInhibit } from "./lib/power.js";
 import { fetchUpstoxSensex } from "./lib/upstox.js";
+import { snapshotFeatures } from "./lib/research.js";
+import { startResearchRuntime } from "./lib/research-runtime.js";
 
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -170,7 +172,11 @@ async function pollOnce() {
     } else {
       const today=dateKey(), latest=store.snapshot();
       if(latest.lastTradeDate!==today) {
-        const best=[candidates.call,candidates.put].filter(Boolean).sort((a,b)=>b.score-a.score)[0];
+        const adaptiveStrategy=latest.validatedResearchChampion;
+        const adaptiveSignal=adaptiveStrategy?latest.researchSignals?.filter(x=>x.strategy===adaptiveStrategy).at(-1):null;
+        const adaptiveFresh=adaptiveSignal&&Date.now()-Date.parse(adaptiveSignal.createdAt)<=120000;
+        const best=adaptiveFresh?(adaptiveSignal.direction==="up"?candidates.call:adaptiveSignal.direction==="down"?candidates.put:null)
+          :[candidates.call,candidates.put].filter(Boolean).sort((a,b)=>b.score-a.score)[0];
         if(best&&best.score>=60) {
           const trade={id:`paper-${Date.now()}`,side:best.side,longStrike:best.long.strike,shortStrike:best.short.strike,
             longType:best.long.type,shortType:best.short.type,entryDebit:best.debit,lotSize:lot,quantity:best.quantity,
@@ -181,7 +187,7 @@ async function pollOnce() {
       }
     }
     providerStatus="connected";lastError="";
-    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp"};});
+    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp",features:snapshotFeatures(chain,timestamp),options:chain.options,candidates};});
   } catch(error) { providerStatus="error";lastError=error.message; }
   finally { busy=false; }
 }
@@ -192,7 +198,7 @@ function stateResponse() {
   return {...state,learning:learningStats(state),monitor:{enabled,providerStatus,lastError,lastPoll:last?.timestamp||null,
     spot:last?.spot||null,expiry:last?.expiry||null,freshness:age<=30000?"Fresh":age<=120000?"Aging":last?"Stale":"No data",
     marketOpen:marketIsOpen(),source:last?.source||null,timestampSource:last?.timestampSource||"provider_timestamp",capital:settings.capital,riskLimit:settings.riskLimit,profitTargetPct:settings.profitTargetPct,
-    lossLimitPct:settings.lossLimitPct,power:powerStatus(),
+    lossLimitPct:settings.lossLimitPct,activeResearchStrategy:state.validatedResearchChampion||"heuristic-baseline",power:powerStatus(),
     predictions:age<=120000&&["connected","outside-market-hours","monitoring-stopped"].includes(providerStatus)?(state.predictions.slice(-1)[0]||null):null}};
 }
 
@@ -221,9 +227,10 @@ app.get("/api/status",(_req,res)=>res.json({app:"FnOPredictor",providers:{primar
 app.use(async(_req,res)=>{try{res.type("html").send(await readFile(path.join(root,"public","index.html")));}catch{res.status(404).send("Application assets not found.");}});
 
 await store.init();
+const researchRuntime=startResearchRuntime({app,store});
 setPowerInhibit(true);
 schedulePoll();
 pollOnce();
 const server=app.listen(port,"127.0.0.1",()=>console.log(`FnOPredictor monitoring at http://localhost:${port}`));
-function shutdown(){if(pollTimer)clearInterval(pollTimer);releasePowerInhibit();server.close(()=>process.exit(0));}
+function shutdown(){if(pollTimer)clearInterval(pollTimer);researchRuntime.stop();releasePowerInhibit();server.close(()=>process.exit(0));}
 process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
