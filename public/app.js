@@ -49,19 +49,20 @@ function buildCandidates(data, lot, budget) {
 function render() {
   if (!snapshot) return;
   const lot=Math.max(1,Number($("lot").value)||1), budget=Math.max(1,Number($("budget").value)||1);
-  const {pcr,candidates}=buildCandidates(snapshot,lot,budget);
+  const age=Math.max(0,Date.now()-new Date(snapshot.timestamp).getTime());
+  const stale=!Number.isFinite(age)||age>120000;
+  const {pcr,candidates:ranked}=buildCandidates(snapshot,lot,budget);
+  const candidates=stale?[]:ranked;
   $("spot").textContent=money(snapshot.spot);
   $("pcr").textContent=fmt(pcr,2);
   $("quoteStamp").textContent=`Source: ${snapshot.source}`;
   $("chainStamp").textContent=new Date(snapshot.timestamp).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"});
-  const age=Math.max(0,Date.now()-new Date(snapshot.timestamp).getTime());
-  const stale=!Number.isFinite(age)||age>120000;
   $("freshness").textContent=stale?"Stale":age<30000?"Fresh":"Aging";
   $("bias").textContent=pcr>1.15?"Bullish":pcr<.85?"Bearish":"Neutral";
   $("biasDetail").textContent=`PCR-based context; not a standalone signal`;
-  $("modelState").textContent=candidates.length?"Indicative model output":"No qualifying spreads";
+  $("modelState").textContent=stale?"Stale data - no recommendations":candidates.length?"Indicative model output":"No qualifying spreads";
   $("modelState").className="pill "+(candidates.length?"good":"muted");
-  $("status").textContent=`${snapshot.mode==="live"?"Provider feed":"Manual/sample data"} · ${snapshot.source} · ${stale?"Snapshot older than 2 minutes":"Timestamp checked"} · ${snapshot.options.length} contracts`;
+  $("status").textContent=`${snapshot.mode==="live"?"Provider feed":snapshot.mode==="sample"?"Synthetic sample":"Manual snapshot"} · ${snapshot.source} · ${stale?"Snapshot older than 2 minutes; recommendations suppressed":"Timestamp checked"} · ${snapshot.options.length} contracts`;
   $("status").className="notice";
   $("recommendations").innerHTML=candidates.length?candidates.map(c=>`<article class="panel strategy">
     <div class="strategy-top"><div><div class="direction">${c.bias} · ${c.name}</div><h3>${c.long.strike} / ${c.short.strike}</h3></div><div><div class="score">${c.score}%</div><div class="direction">Model score</div></div></div>
