@@ -30,7 +30,7 @@ Open http://localhost:3000. Keep the terminal/server running for continuous moni
 
 ## Live data
 
-Live data uses the native Upstox adapter when `UPSTOX_ACCESS_TOKEN` is configured. Upstox documents free market-data APIs and supports the BSE SENSEX option chain with bid/ask, OI, volume, IV and weekly-expiry metadata. An Upstox account and API token are required. The app records local retrieval time because the documented chain response has no exchange timestamp. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
+Live data uses the native Upstox adapter when `UPSTOX_ACCESS_TOKEN` is configured. Upstox documents free market-data APIs and supports the BSE SENSEX option chain with bid/ask, OI, volume, IV and weekly-expiry metadata. An Upstox account and free one-year read-only Analytics Token are required. No static IP is needed for market-data APIs. The app records local retrieval time because the documented chain response has no exchange timestamp. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
 ## Risk and model limitations
 
