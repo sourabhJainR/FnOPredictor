@@ -64,8 +64,9 @@ function learningStats(state) {
 }
 function makeReportHtml(date,state) {
   const esc=(v)=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const trades=state.trades.filter(t=>t.openedAt?.startsWith(date)||t.closedAt?.startsWith(date));
-  const predictions=state.predictions.filter(p=>p.timestamp?.startsWith(date));
+  const localDay=(value)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));
+  const trades=state.trades.filter(t=>(t.openedAt&&localDay(t.openedAt)===date)||(t.closedAt&&localDay(t.closedAt)===date));
+  const predictions=state.predictions.filter(p=>p.timestamp&&localDay(p.timestamp)===date);
   const pnl=trades.filter(t=>t.status==="closed").reduce((s,t)=>s+Number(t.realizedPnl||0),0);
   const rows=trades.map(t=>`<tr><td>${esc(t.side)}</td><td>${esc(t.longStrike)} / ${esc(t.shortStrike)}</td><td>${esc(t.status)}</td><td>₹${Number(t.realizedPnl||0).toFixed(2)}</td><td>${esc(t.exitReason||"Open / not exited")}</td></tr>`).join("");
   const signals=predictions.slice(-100).map(p=>`<tr><td>${esc(new Date(p.timestamp).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"}))}</td><td>${esc(p.expiry)}</td><td>${esc(p.call? p.call.long.strike+"/"+p.call.short.strike:"No call spread")}</td><td>${esc(p.put? p.put.long.strike+"/"+p.put.short.strike:"No put spread")}</td></tr>`).join("");
@@ -111,7 +112,8 @@ async function pollOnce() {
     }
     const chain=normalizeChain(chainResult.data,quote.data,"live");
     const weekly=Array.isArray(chainResult.data.weeklyExpiries)?chainResult.data.weeklyExpiries:[];
-    const todayKey=dateKey();\n    const selected=weekly.map(String).filter(validIso).sort().find(x=>x.slice(0,10)>=todayKey);
+    const todayKey=dateKey();
+    const selected=weekly.map(String).filter(validIso).sort().find(x=>x.slice(0,10)>=todayKey);
     if(!selected||String(chainResult.data.expiry||"")!==selected||String(chainResult.data.expiryType||"").toLowerCase()!=="weekly") {
       providerStatus="invalid-expiry";
       lastError="Provider must return the nearest weekly expiry, weeklyExpiries and expiryType=weekly. Recommendations suppressed.";
@@ -121,7 +123,8 @@ async function pollOnce() {
     const lot=chain.lotSize||settings.lotSize;
     if(!lot||lot<=0)throw new Error("SENSEX lot size missing; configure it from current contract specifications.");
     const state=store.snapshot(), learning=learningStats(state);
-    const effectiveRisk=Math.min(settings.riskLimit,settings.capital);\n    const candidates=buildSpreadCandidates(chain,lot,effectiveRisk,learning);
+    const effectiveRisk=Math.min(settings.riskLimit,settings.capital);
+    const candidates=buildSpreadCandidates(chain,lot,effectiveRisk,learning);
     const timestamp=chain.timestamp;
     if(state.lastSnapshotTimestamp!==timestamp) {
       await store.transact(s=>{
