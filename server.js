@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createStore } from "./lib/store.js";
 import { normalizeChain, buildSpreadCandidates, evaluateExit } from "./lib/strategy.js";
 import { powerStatus, setPowerInhibit, releasePowerInhibit } from "./lib/power.js";
-import { fetchUpstoxSensex } from "./lib/upstox.js";
+import { fetchBseSensex } from "./lib/bse.js";
 
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -14,8 +14,7 @@ const port = Number(process.env.PORT || 3000);
 const ttlMs = Math.max(5_000, Number(process.env.CACHE_TTL_MS || 15_000));
 const pollDefault = Math.max(10, Number(process.env.POLL_SECONDS || 15));
 const store = createStore(path.join(root, "data", "state.json"));
-const sources = { quote: process.env.BSE_QUOTE_JSON_URL, chain: process.env.BSE_OPTION_CHAIN_JSON_URL };
-const upstox = { token: process.env.UPSTOX_ACCESS_TOKEN, instrumentKey: process.env.UPSTOX_INSTRUMENT_KEY || "BSE_INDEX|SENSEX" };
+const bse = { endpoint: process.env.BSE_MARKET_DATA_URL, token: process.env.BSE_MARKET_DATA_TOKEN };
 const settings = {
   pollSeconds: pollDefault, capital: Number(process.env.CAPITAL_INR || 10000),
   riskLimit: Math.min(2000, Number(process.env.RISK_LIMIT_INR || 2000)),
@@ -104,8 +103,8 @@ async function pollOnce() {
   busy=true;
   try {
     if(!marketIsOpen()) {
-      providerStatus=!enabled?"monitoring-stopped":(upstox.token||(sources.quote&&sources.chain)?"outside-market-hours":"not-configured");
-      if(enabled&&!upstox.token&&(!sources.quote||!sources.chain))lastError="Set UPSTOX_ACCESS_TOKEN in .env, or configure approved custom quote and chain endpoints.";
+      providerStatus=!enabled?"monitoring-stopped":(bse.endpoint&&bse.token?"outside-market-hours":"not-configured");
+      if(enabled&&(!bse.endpoint||!bse.token))lastError="Configure BSE_MARKET_DATA_URL and BSE_MARKET_DATA_TOKEN from an authorised BSE data-feed subscription.";
       const p=localParts();
       if(Number(p.hour)>15 || (Number(p.hour)===15&&Number(p.minute)>=35)) {
         const today=dateKey(); if(!store.snapshot().reports.some(r=>r.date===today&&r.finalized)) await generateReport(today,true);
@@ -113,22 +112,14 @@ async function pollOnce() {
       return;
     }
     if(!enabled)return;
-    let quote, chainResult;
-    if (upstox.token) {
-      const snapshot = await fetchUpstoxSensex({ accessToken: upstox.token, instrumentKey: upstox.instrumentKey });
-      quote = { status: "ok", source: "Upstox", data: snapshot.quote };
-      chainResult = { status: "ok", source: "Upstox", data: snapshot.chain };
-    } else {
-      [quote,chainResult] = await Promise.all([
-        fetchJson("quote",{symbol:"SENSEX"}),
-        fetchJson("chain",{symbol:"SENSEX",expiry:"nearest-weekly"})
-      ]);
-    }
-    if(quote.status!=="ok"||chainResult.status!=="ok") {
-      providerStatus=quote.status==="unconfigured"||chainResult.status==="unconfigured"?"not-configured":"error";
-      lastError=[quote.message,chainResult.message].filter(Boolean).join(" ");
+    if (!bse.endpoint || !bse.token) {
+      providerStatus = "not-configured";
+      lastError = "Configure BSE_MARKET_DATA_URL and BSE_MARKET_DATA_TOKEN from an authorised BSE data-feed subscription.";
       return;
     }
+    const snapshot = await fetchBseSensex({ endpoint: bse.endpoint, accessToken: bse.token });
+    const quote = { status: "ok", source: "BSE Self Data Feed", data: snapshot.quote };
+    const chainResult = { status: "ok", source: "BSE Self Data Feed", data: snapshot.chain };
     const quoteAge=Date.now()-Date.parse(quote.data?.timestamp||"");
     const chainAge=Date.now()-Date.parse(chainResult.data?.timestamp||"");
     if(!validIso(quote.data?.timestamp)||!validIso(chainResult.data?.timestamp)||quoteAge < -30000||chainAge < -30000||quoteAge > 120000||chainAge > 120000)
@@ -217,7 +208,7 @@ app.get("/reports/:date.html",async(req,res)=>{
   try{res.type("html").send(await readFile(path.join(root,"reports",`${req.params.date}.html`),"utf8"));}
   catch{return res.status(404).send("Report not generated yet.");}
 });
-app.get("/api/status",(_req,res)=>res.json({app:"FnOPredictor",providers:{primary:upstox.token?"upstox":"custom",quote:upstox.token||sources.quote?"configured":"not-configured",optionChain:upstox.token||sources.chain?"configured":"not-configured"},monitoring:enabled,pollSeconds:settings.pollSeconds,power:powerStatus(),timezone:"Asia/Kolkata"}));
+app.get("/api/status",(_req,res)=>res.json({app:"FnOPredictor",providers:{primary:"bse",name:"BSE Self Data Feed",configured:Boolean(bse.endpoint&&bse.token),quote:bse.endpoint&&bse.token?"configured":"not-configured",optionChain:bse.endpoint&&bse.token?"configured":"not-configured"},monitoring:enabled,pollSeconds:settings.pollSeconds,power:powerStatus(),timezone:"Asia/Kolkata"}));
 app.use(async(_req,res)=>{try{res.type("html").send(await readFile(path.join(root,"public","index.html")));}catch{res.status(404).send("Application assets not found.");}});
 
 await store.init();
