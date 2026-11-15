@@ -1,37 +1,46 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#101827"><meta name="description" content="BSE options spread research and risk analysis">
-  <title>FnOPredictor | BSE Options Research</title><link rel="stylesheet" href="/styles.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827"><meta name="description" content="Continuous BSE SENSEX options monitoring and paper trading">
+<title>FnOPredictor | SENSEX Monitor</title><link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header class="topbar"><a class="brand" href="/">FnO<span>Predictor</span></a><div class="top-meta"><span id="connection" class="pill muted">Checking data feeds</span><span class="market-label">BSE DERIVATIVES</span></div></header>
+<header class="topbar"><a class="brand" href="/">FnO<span>Predictor</span></a><div class="top-meta"><span id="monitorState" class="pill muted">Starting monitor</span><span class="market-label">BSE SENSEX · IST</span></div></header>
 <main class="shell">
-  <section class="intro"><div><p class="eyebrow">OPTIONS STRATEGY WORKSPACE</p><h1>Find defined-risk spread opportunities.</h1><p class="sub">Live market inputs, transparent payoff maths and explainable model scores.</p></div><a class="source-link" href="https://www.bseindia.com/markets/Derivatives/DeriReports/DeriOptionchain.html" target="_blank" rel="noreferrer">BSE option chain ↗</a></section>
-  <section class="controls panel">
-    <label>Underlying symbol<input id="symbol" value="SENSEX" maxlength="30" autocomplete="off"></label>
-    <label>Expiry date<input id="expiry" type="date"></label>
-    <label>Contract lot size<input id="lot" type="number" min="1" placeholder="Required if feed omits it"></label>
-    <label>Risk budget (₹)<input id="budget" type="number" min="1" value="10000"></label>
-    <button id="refresh" class="primary">Refresh market data</button>
-  </section>
-  <div id="status" class="notice">Market data is not connected. Configure an approved JSON feed or load a chain snapshot.</div>
-  <section class="metrics" id="marketMetrics">
-    <article class="metric panel"><span>Underlying</span><strong id="spot">—</strong><small id="quoteStamp">No quote</small></article>
-    <article class="metric panel"><span>Market bias</span><strong id="bias">—</strong><small id="biasDetail">Awaiting option chain</small></article>
-    <article class="metric panel"><span>Put / Call OI ratio</span><strong id="pcr">—</strong><small>Calculated from loaded chain</small></article>
-    <article class="metric panel"><span>Data freshness</span><strong id="freshness">—</strong><small id="chainStamp">No chain snapshot</small></article>
-  </section>
-  <section class="panel upload-panel">
-    <div><h2>Load option-chain snapshot</h2><p>Use a permitted provider feed or paste normalized JSON. Manual snapshots are never labelled live.</p></div>
-    <div class="upload-actions"><input id="chainFile" type="file" accept=".json,application/json"><button id="loadSample" class="secondary">Load sample data</button></div>
-    <details><summary>Expected JSON format</summary><pre>{"spot": 80000, "timestamp": "2026-11-15T09:30:00+05:30", "source": "provider name", "expiry": "2026-11-26", "options": [{"strike":80000,"type":"CE","bid":120,"ask":125,"ltp":123,"oi":12000,"volume":800,"iv":14},{"strike":80000,"type":"PE","bid":110,"ask":115,"ltp":112,"oi":10000,"volume":700,"iv":15}]}</pre></details>
-  </section>
-  <section class="section-head"><div><p class="eyebrow">MODEL OUTPUT</p><h2>Spread recommendations</h2></div><span id="modelState" class="pill muted">Waiting for data</span></section>
-  <div id="recommendations" class="recommendations"><div class="empty panel">Connect a market feed or load a snapshot to calculate spreads.</div></div>
-  <section class="panel methodology"><h2>How the score works</h2><p>The confidence score is a heuristic ranking score, not a calibrated probability of profit. It combines directional bias from put/call open interest, option liquidity, spread cost and implied volatility. It is not a backtested win rate.</p><p>Payoff estimates use executable-side quotes where available (ask to buy, bid to sell). If only LTP is available, the result is marked indicative. Brokerage, taxes, slippage and partial fills are excluded.</p></section>
-  <footer>For research only. No order placement. Options can lose the full debit paid; review liquidity and contract specifications before trading.</footer>
-</main>
-<script type="module" src="/app.js"></script>
+<section class="intro"><div><p class="eyebrow">CONTINUOUS MARKET MONITOR</p><h1>SENSEX options, monitored through the session.</h1><p class="sub">Nearest weekly expiry · Call and put debit spreads · Paper P&amp;L · Daily HTML report</p></div><a class="source-link" href="https://www.bseindia.com/markets/derivatives/derireports/derioptionchain" target="_blank" rel="noreferrer">BSE option chain</a></section>
+<section class="toolbar panel"><div class="status-group"><span id="providerState" class="pill bad">Checking provider</span><span id="powerState" class="pill muted">Checking sleep prevention</span></div><div class="actions"><button id="refreshNow" class="secondary">Poll now</button><button id="start" class="primary">Start monitoring</button><button id="stop" class="secondary">Stop monitoring</button><button id="powerToggle" class="secondary">Toggle sleep prevention</button></div></section>
+<div class="notice"><strong>Advisory and paper trading only.</strong> No orders are sent. The app records simulated fills from bid/ask quotes. A real BSE data provider must be configured; the BSE web page itself is not treated as an unrestricted API. Stale or incomplete data suppresses new trades.</div>
+<section class="metrics">
+<article class="metric panel"><span>SENSEX spot</span><strong id="spot">—</strong><small id="lastUpdate">No quote received</small></article>
+<article class="metric panel"><span>Nearest weekly expiry</span><strong id="expiry">—</strong><small id="marketState">Waiting for session</small></article>
+<article class="metric panel"><span>Quote freshness</span><strong id="freshness">—</strong><small>Maximum age 2 minutes</small></article>
+<article class="metric panel"><span>Today's realized paper P&amp;L</span><strong id="dailyPnl">₹0.00</strong><small><span id="tradeCount">0</span> closed paper trades</small></article>
+</section>
+<section class="section-head"><div><p class="eyebrow">LIVE STRATEGY OUTPUT</p><h2>Best executable spread on each side</h2></div><span class="muted-copy">Buy at ask · Sell at bid</span></section>
+<section class="recommendations">
+<article class="panel strategy-card"><div class="card-head"><div><p class="eyebrow">CALL BUY / SELL PAIR</p><h2>Bull call debit spread</h2></div><span class="pill muted">Call side</span></div><div id="callCard"><div class="empty">Waiting for fresh chain.</div></div></article>
+<article class="panel strategy-card"><div class="card-head"><div><p class="eyebrow">PUT BUY / SELL PAIR</p><h2>Bear put debit spread</h2></div><span class="pill muted">Put side</span></div><div id="putCard"><div class="empty">Waiting for fresh chain.</div></div></article>
+</section>
+<section class="grid-two">
+<article class="panel"><div class="section-head inner"><div><p class="eyebrow">PAPER POSITION</p><h2>Active trade</h2></div></div><div id="activeTrade" class="active-trade">No active paper position</div><div class="rule-grid"><div><small>Profit booking</small><strong id="targetRule">+25%</strong></div><div><small>Loss booking</small><strong id="stopRule">-30%</strong></div><div><small>Time exit</small><strong>15:20 IST</strong></div><div><small>Daily trade cap</small><strong>1 position</strong></div></div></article>
+<article class="panel"><div class="section-head inner"><div><p class="eyebrow">RISK CONTROL</p><h2>Capital and limits</h2></div></div><div class="risk-grid"><div><small>Capital</small><strong id="capital">₹10,000</strong></div><div><small>Maximum total risk</small><strong id="riskLimit">₹2,000</strong></div></div><p class="muted-copy">One defined-risk spread at a time. No naked selling, averaging or automatic order placement. Quantity is sized so maximum debit risk stays within the configured limit.</p></article>
+</section>
+<section class="panel settings-panel"><div><p class="eyebrow">MONITOR SETTINGS</p><h2>Polling and exit rules</h2><p class="muted-copy">Settings are held locally while the server runs.</p></div>
+<form id="settings" class="settings-grid">
+<label>Poll interval (seconds)<input id="pollSeconds" type="number" min="10" max="60" value="15"></label>
+<label>Capital (₹)<input id="capitalInput" type="number" min="1000" value="10000"></label>
+<label>Maximum risk (₹)<input id="riskInput" type="number" min="100" max="2000" value="2000"></label>
+<label>Profit target (%)<input id="targetInput" type="number" min="5" max="100" value="25"></label>
+<label>Loss limit (%)<input id="stopInput" type="number" min="5" max="60" value="30"></label>
+<label>SENSEX lot size<input id="lotSize" type="number" min="1" value="20"></label>
+<button class="primary" type="submit">Save settings</button>
+</form></section>
+<section class="panel ledger"><div class="section-head inner"><div><p class="eyebrow">OBSERVATION AND LEARNING</p><h2>Paper trade ledger</h2><p id="modelStats" class="muted-copy">No outcomes recorded yet.</p></div><button id="reportNow" class="secondary">Generate today's HTML report</button></div>
+<div class="table-wrap"><table><thead><tr><th>Opened (IST)</th><th>Side</th><th>Spread</th><th>Status</th><th>Realized P&amp;L</th><th>Exit reason</th></tr></thead><tbody id="tradeRows"><tr><td colspan="6">No paper trades recorded.</td></tr></tbody></table></div>
+<div class="reports"><strong>Daily reports:</strong> <span id="reportLinks">Reports are created after the market close.</span></div>
+</section>
+<section class="panel methodology"><h2>How the application learns</h2><p>Every new provider snapshot records the best call and put spread. When the paper position closes, the realized simulated outcome is added to the ledger. After 20 closed outcomes for a side, its observed win rate adjusts that side's ranking score with a small bounded correction. This is outcome calibration, not proof of predictive skill; small samples remain labelled insufficient.</p><p>Profit is booked at a 25% gain on spread debit, loss is cut at a 30% debit decline, or the position is closed at 15:20 IST. If exit quotes are unavailable, the position remains open and is not assigned a made-up result. Daily reports show realized paper P&amp;L, trades and recorded predictions.</p></section>
+<footer>Local research application. No order execution. Paper fills are estimates and exclude brokerage, taxes, slippage, queue priority and partial fills. A provider must return the nearest weekly expiry with executable bid/ask quotes.</footer>
+</main><script type="module" src="/monitor.js"></script>
 </body></html>
