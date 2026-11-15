@@ -10,3 +10,23 @@ test("probability calibration requires a meaningful sample",()=>{assert.equal(ca
 test("event detector flags large moves and positioning extremes",()=>{const h=history(2);h[1].spot=h[0].spot*1.01;h[1].pcr=1.7;assert.ok(detectMarketEvents(h).length>=2);});
 test("news classification records topics and sentiment without asserting causality",()=>{const item=scoreNewsItem({title:"RBI rate cut lifts Sensex",summary:"India market gains",source:"test"});assert.ok(item.topics.includes("rbi"));assert.equal(item.sentiment,"positive");});
 test("snapshot features derive PCR and volatility from option data",()=>{const f=snapshotFeatures({spot:100,options:[{type:"CE",oi:100,volume:10,iv:12},{type:"PE",oi:150,volume:20,iv:14}]});assert.equal(f.pcr,1.5);assert.equal(f.avgIv,13);});
+
+test("confidence calibration waits for 30 outcomes and a ten-item neighbourhood",()=>{
+ const outcomes=Array.from({length:30},(_,i)=>({strategy:"rsi_14",probability:.7,success:i<22}));
+ const result=calibrateProbability("rsi_14",.7,outcomes);
+ assert.equal(result.calibrated,true);assert.ok(result.probability>.5);
+});
+test("challenger promotion requires forecast and shadow paper evidence",()=>{
+ const outcomes=[];
+ for(let i=0;i<50;i++){
+  const date=new Date(Date.UTC(2026,0,1+i,10)).toISOString();
+  outcomes.push({strategy:"buy_hold",createdAt:date,success:i%2===0,brier:.25,directionalReturnPct:.05});
+  outcomes.push({strategy:"rsi_14",createdAt:date,success:true,brier:.05,directionalReturnPct:.2});
+ }
+ const shadows=[];
+ for(let i=0;i<15;i++){
+  shadows.push({strategy:"buy_hold",status:"closed",maxRisk:100,realizedPnl:1});
+  shadows.push({strategy:"rsi_14",status:"closed",maxRisk:100,realizedPnl:10});
+ }
+ assert.equal(researchLeaderboard(outcomes,history(),shadows).champion,"rsi_14");
+});
