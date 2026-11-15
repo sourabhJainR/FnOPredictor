@@ -10,6 +10,9 @@ The research engine currently compares:
 
 - Momentum: five-observation and twenty-observation price returns.
 - Mean reversion: deviation from a rolling twenty-observation mean.
+- RSI(14): momentum exhaustion and strength.
+- MACD(12,26,9): trend direction and momentum crossover.
+- Bollinger(20): rolling standard-deviation bands for mean reversion.
 - Put/call positioning: PCR level and its change.
 - Volatility breakout: price movement adjusted for change in average option implied volatility.
 
