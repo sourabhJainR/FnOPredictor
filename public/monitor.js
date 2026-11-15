@@ -41,7 +41,16 @@ function renderState(s) {
   $("modelStats").textContent=`Predictions ${s.predictions?.length||0} · Call outcomes ${s.learning?.call?.count||0} · Put outcomes ${s.learning?.put?.count||0}`;
   $("reportLinks").innerHTML=(s.reports||[]).slice(-10).reverse().map(r=>`<a href="/reports/${encodeURIComponent(r.date)}.html" target="_blank">${r.date} report</a>`).join(" · ")||"Reports are created after the market close.";
 }
-async function refresh(){try{const r=await fetch("/api/monitor/state");if(!r.ok)throw new Error(await r.text());renderState(await r.json());}catch(e){pill("providerState","Server error","bad");}}
+function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function renderResearch(r){
+  $("researchStats").textContent="Snapshots "+(r.historyPoints||0)+" · Resolved forecasts "+(r.resolvedOutcomes||0)+" · Pending forecasts "+(r.pendingSignals||0);
+  $("championStatus").textContent=r.championStatus||"Research baseline is collecting evidence.";
+  $("newsState").textContent=r.newsConfigured?(r.newsError?"News feed error":"News feeds connected"):"News feeds not configured";
+  $("researchRows").innerHTML=(r.leaderboard||[]).map(x=>"<tr><td>"+escapeHtml(x.strategy)+"</td><td>"+x.samples+"</td><td>"+(x.winRate==null?"—":number(x.winRate*100,1)+"%")+"</td><td>"+(x.averageReturnPct==null?"—":number(x.averageReturnPct,3)+"%")+"</td><td>"+(x.brier==null?"—":number(x.brier,4))+"</td><td>"+x.sessions+"</td></tr>").join("")||'<tr><td colspan="6">Waiting for research observations.</td></tr>';
+  $("eventFeed").innerHTML=(r.events||[]).slice(0,8).map(e=>"<p><strong>"+escapeHtml(e.title)+"</strong><br><small>"+escapeHtml(e.type)+" · "+escapeHtml(e.severity)+" · "+(e.timestamp?new Date(e.timestamp).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):"")+"</small></p>").join("")||"No events recorded yet.";
+  $("newsFeed").innerHTML=(r.news||[]).slice(0,8).map(n=>"<p><strong>"+escapeHtml(n.title)+"</strong><br><small>"+escapeHtml(n.source)+" · "+escapeHtml(n.sentiment)+" · "+escapeHtml((n.topics||[]).join(", "))+"</small></p>").join("")||(r.newsConfigured?"No news items returned yet.":"Configure NEWS_FEED_URLS in .env to monitor RSS/Atom news.");
+}
+async function refresh(){try{const responses=await Promise.all([fetch("/api/monitor/state"),fetch("/api/research/state")]);if(!responses[0].ok)throw new Error(await responses[0].text());renderState(await responses[0].json());if(responses[1].ok)renderResearch(await responses[1].json());}catch(e){pill("providerState","Server error","bad");}}
 async function action(url){await fetch(url,{method:"POST"});await refresh();}
 $("start").addEventListener("click",()=>action("/api/monitor/start"));
 $("stop").addEventListener("click",()=>action("/api/monitor/stop"));
