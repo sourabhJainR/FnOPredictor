@@ -58,5 +58,6 @@ $("powerToggle").addEventListener("click",()=>action("/api/power/toggle"));
 $("refreshNow").addEventListener("click",()=>action("/api/monitor/poll"));
 $("reportNow").addEventListener("click",()=>action("/api/reports/generate"));
 $("settings").addEventListener("submit",async e=>{e.preventDefault();await fetch("/api/monitor/settings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({pollSeconds:Number($("pollSeconds").value),capital:Number($("capitalInput").value),riskLimit:Number($("riskInput").value),profitTargetPct:Number($("targetInput").value),lossLimitPct:Number($("stopInput").value),lotSize:Number($("lotSize").value)})});await refresh();});
+$("eventForm").addEventListener("submit",async e=>{e.preventDefault();const title=$("eventTitle").value.trim();if(!title)return;const local=$("eventDate").value;const payload={title,severity:$("eventSeverity").value,summary:$("eventSummary").value,timestamp:local?new Date(local).toISOString():new Date().toISOString()};const response=await fetch("/api/research/events",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});if(response.ok){$("eventForm").reset();await refresh();}});
 refresh();timer=setInterval(refresh,5000);
 window.addEventListener("beforeunload",()=>clearInterval(timer));
