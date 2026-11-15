@@ -19,7 +19,7 @@ function renderState(s) {
   pill("powerState",m.power?.active?"Sleep prevention active":"Sleep prevention inactive",m.power?.active?"good":"muted");
   $("spot").textContent=money(m.spot);
   $("expiry").textContent=m.expiry||"Awaiting chain";
-  $("lastUpdate").textContent=m.lastPoll?new Date(m.lastPoll).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):"Not started";
+  $("lastUpdate").textContent=m.lastPoll?new Date(m.lastPoll).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):"Not started";\n  $("sourceInfo").textContent=m.source?`Source: ${m.source} · Timestamp: ${m.timestampSource==="retrieved_at"?"local retrieval time":"provider timestamp"}`:"Provider not connected";
   $("freshness").textContent=m.freshness||"No data";
   $("marketState").textContent=m.marketOpen?"Market session":"Outside market hours";
   renderCandidate("callCard",m.predictions?.call,"CALL BUY / SELL");
