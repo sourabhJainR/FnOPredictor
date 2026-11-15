@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {snapshotFeatures,buildResearchSignals,resolveResearchSignals,researchLeaderboard,calibrateProbability,detectMarketEvents,scoreNewsItem} from "../lib/research.js";
 
 function history(n=40){return Array.from({length:n},(_,i)=>({timestamp:new Date(Date.UTC(2026,0,1,0,i)).toISOString(),spot:80000+i*10,pcr:1+(i%4)*0.1,avgIv:14,callOi:1000,putOi:1100,callVolume:200,putVolume:250}));}
-test("research strategies emit independent, explainable forecasts after warmup",()=>{const h=history();const signals=buildResearchSignals(h);assert.equal(signals.length,7);assert.ok(signals.every(x=>x.reason&&x.entrySpot>0&&x.horizon===5));});
+test("research strategies emit independent, explainable forecasts after warmup",()=>{const h=history();const signals=buildResearchSignals(h);assert.equal(signals.length,8);assert.ok(signals.every(x=>x.reason&&x.entrySpot>0&&x.horizon===5));});
 test("walk-forward resolver waits for five future observations",()=>{const h=history(25),signals=buildResearchSignals(h);const first=signals[0];const result=resolveResearchSignals([first],h,[]);assert.equal(result.pending.length,1);const extended=[...h,...history(6).map((x,i)=>({...x,timestamp:new Date(Date.now()+i*60000).toISOString(),spot:80500+i*20}))];const done=resolveResearchSignals([first],extended,[]);assert.equal(done.resolved.length,1);});
 test("leaderboard does not promote a strategy on a small sample",()=>{const result=researchLeaderboard([]);assert.equal(result.champion,"momentum");});
 test("probability calibration requires a meaningful sample",()=>{assert.equal(calibrateProbability("momentum",.7,[]).calibrated,false);});
