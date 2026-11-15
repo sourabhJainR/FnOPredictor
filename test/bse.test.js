@@ -95,3 +95,18 @@ test("BSE fetcher reports HTTP errors without exposing the access token", async 
     endpoint: "https://feed.example.test/data", accessToken: "secret-token", fetchImpl
   }), /Access denied/);
 });
+
+test("BSE fetcher supports the authentication header issued by the exchange", async () => {
+  let headers;
+  const fetchImpl = async (_url, init) => {
+    headers = init.headers;
+    return { ok: true, status: 200, json: async () => payload };
+  };
+  await fetchBseSensex({
+    endpoint: "https://feed.example.test/data",
+    accessToken: "api-key", authHeader: "X-API-Key", authScheme: "",
+    fetchImpl
+  });
+  assert.equal(headers["X-API-Key"], "api-key");
+  assert.equal(headers.Authorization, undefined);
+});
