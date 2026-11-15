@@ -1,108 +1,75 @@
 # Market data provider
 
-## Primary provider: Upstox Developer API
+## Primary provider: BSE Self Data Feed
 
-FnOPredictor now has a native Upstox adapter for BSE SENSEX. Upstox states that its trading and market-data APIs are free to use. Access requires an Upstox account, an API app and a valid bearer token. The token is stored locally in .env; it is never sent to the browser or written to the trade ledger.
+FnOPredictor now uses BSE as its only market-data provider. Upstox integration and the undocumented BSE public-page XHR fallback are not used.
 
-Official references:
-- API pricing and free access: https://upstox.com/trading-api/
-- Option chain endpoint: https://upstox.com/developer/api-documentation/get-pc-option-chain/
-- Option contract and weekly-expiry metadata: https://upstox.com/developer/api-documentation/get-option-contracts/
-- Instrument key reference: https://upstox.com/developer/api-documentation/instruments/
-- Analytics Token setup: https://upstox.com/developer/api-documentation/analytics-token/
+BSE's official market-data portal lists Equity Derivatives API data and describes registration, KYC, data-plan selection, agreement and payment steps. It also advertises limited trial access for selected feeds. BSE must provide the endpoint, authentication method, message/response specification and the permitted usage category for the user's account before live integration can be activated.
 
-### Data mapping
+Official entry points:
+- BSE Self Data Feed: https://marketdata.bseindia.com/
+- BSE public SENSEX option-chain page: https://www.bseindia.com/markets/Derivatives/DeriReports/DeriOptionchain.html
+- SEBI's curated BSE options-chain link: https://www.sebi.gov.in/curation/equity_derivatives.html
 
-The adapter uses the BSE index instrument key BSE_INDEX|SENSEX.
+The public option-chain webpage is for viewing market data. Its browser XHR calls are not treated as a supported or licensed API. The application does not replay browser cookies, mimic browser sessions, scrape the page, or bypass access controls.
 
-1. Calls GET /v2/option/contract?instrument_key=BSE_INDEX%7CSENSEX&expiry_date=current_week.
-2. Requires returned contracts to identify BSE_FO, the SENSEX underlying, weekly=true, and a consistent lot size. It selects the earliest unexpired weekly expiry.
-3. Calls GET /v2/option/chain?instrument_key=BSE_INDEX%7CSENSEX&expiry_date=YYYY-MM-DD.
-4. Maps each strike's call and put legs into the app's normalized JSON format:
-   - strike_price → strike
-   - market_data.bid_price / ask_price → executable bid / ask
-   - market_data.ltp → ltp
-   - market_data.oi, volume → oi, volume
-   - option_greeks.iv → iv
-   - underlying_spot_price → SENSEX spot
-   - contract lot_size → lot size
+## Configure the authorised feed
 
-The option-chain endpoint returns the SENSEX spot and option quotes in one response, so the adapter does not mix spot values from a different provider.
+After BSE approves the subscription and provides API access, copy `.env.example` to `.env` and set the exact HTTPS endpoint and token issued for the subscription:
 
-**Timestamp note:** the documented option-chain response does not expose a per-snapshot exchange timestamp. The adapter records the local retrieval time and labels it retrieved_at. This confirms when the app fetched the snapshot, not the exchange's original quote timestamp. The monitor also requires valid bid/ask values; stale or missing quotes suppress recommendations. Do not interpret the retrieval timestamp as an exchange timestamp.
+```dotenv
+BSE_MARKET_DATA_URL=https://the-exact-endpoint-provided-by-bse
+BSE_MARKET_DATA_TOKEN=the-token-provided-by-bse
+POLL_SECONDS=15
+```
 
-### Configure Upstox
+The token stays on the local server and is never sent to the browser or written to the trade ledger. Do not commit `.env` or paste credentials into chat.
 
-1. Create or use an Upstox account.
-2. Open the Upstox Developer Apps page, select the Analytics tab and generate an Analytics Token. It is free, read-only, valid for one year, and supports the Option Chain API without a static IP. It cannot place or modify orders.
-3. Copy .env.example to .env and set:
+**Activation status:** code and contract tests are implemented, but a live BSE handshake cannot be claimed until the user has an authorised feed endpoint, credentials and the matching BSE response specification. The app stays `not-configured` when either endpoint or token is missing. It does not silently fall back to Upstox, Quantsapp, synthetic values or public-site scraping.
 
-    UPSTOX_ACCESS_TOKEN=your_token_here
-    UPSTOX_INSTRUMENT_KEY=BSE_INDEX|SENSEX
-    POLL_SECONDS=15
+## Adapter response contract
 
-4. Run npm start.
+The BSE adapter expects the configured BSE endpoint to return JSON in the following normalized shape. This is the FnOPredictor adapter contract, not a claim that BSE's API natively returns these exact property names. If BSE supplies a different schema, map it in `lib/bse.js` against the official feed manual before enabling the feed.
 
-The app uses current_week on each polling cycle, so the expiry rolls forward automatically. The server keeps the token in its environment and calls Upstox directly. Never commit .env, paste the token into the dashboard, or share it in chat. The repository ignores local environment files.
+```json
+{
+  "spot": 81500.25,
+  "timestamp": "2026-11-16T10:05:00+05:30",
+  "source": "BSE Self Data Feed",
+  "lotSize": 20,
+  "expiry": "2026-11-17",
+  "expiryType": "weekly",
+  "weeklyExpiries": ["2026-11-17"],
+  "options": [
+    {"strike": 81500, "type": "CE", "bid": 180, "ask": 182, "ltp": 181, "oi": 12000, "volume": 800, "iv": 15.2, "bidQty": 20, "askQty": 25},
+    {"strike": 81500, "type": "PE", "bid": 175, "ask": 177, "ltp": 176, "oi": 13000, "volume": 900, "iv": 15.5, "bidQty": 30, "askQty": 35}
+  ]
+}
+```
 
-Upstox says its APIs are free, but account eligibility, authentication, API access and exchange-data terms still apply. A valid token is required; this is not an anonymous public feed.
+The adapter also accepts the common aliases `underlyingSpot`, `exchangeTimestamp`, `strikePrice`, `optionType`, `bestBidPrice`, `bestAskPrice`, `lastTradedPrice`, `openInterest`, `tradedVolume`, `impliedVolatility`, `bestBidQuantity` and `bestAskQuantity`.
 
-## Optional custom provider
+## Validation and failure behaviour
 
-If Upstox is not configured, the application can use approved HTTPS JSON endpoints:
-- BSE_QUOTE_JSON_URL: receives symbol=SENSEX.
-- BSE_OPTION_CHAIN_JSON_URL: receives symbol=SENSEX&expiry=nearest-weekly.
+- HTTPS endpoint and bearer-token authentication are mandatory.
+- A request times out after ten seconds.
+- Exchange timestamp, SENSEX spot, weekly expiry, expiry list and lot size are mandatory.
+- Bid and ask must be positive and non-crossed; bid/ask quantities must be positive for at least four contracts.
+- Invalid, stale or missing snapshots suppress recommendations and paper-trade updates.
+- The adapter rejects duplicate strike/type rows and invalid OI, volume or IV values.
+- No data is fabricated when the provider is unavailable.
+- The provider timestamp is kept distinct from the local retrieval timestamp.
 
-Do not use undocumented endpoints or scrape around exchange access controls. Confirm the provider's data licence, personal-use terms and rate limits.
+## BSE access and licence
 
-## Provider response contract
+BSE's data portal says customers must register, complete KYC, select data plans, agree pricing and agreements, and obtain access. It lists Equity Derivatives API and trial access for selected feeds. The applicable price and usage rights depend on the selected plan and user category; confirm with BSE whether a single-user local research and paper-trading application is permitted under the intended licence.
 
-Quote endpoint:
+## Monitoring safeguards
 
-    {
-      "spot": 81500.25,
-      "timestamp": "2026-11-16T10:05:00+05:30"
-    }
-
-Option-chain endpoint:
-
-    {
-      "spot": 81500.25,
-      "timestamp": "2026-11-16T10:05:00+05:30",
-      "source": "Approved provider",
-      "lotSize": 20,
-      "expiry": "2026-11-17",
-      "expiryType": "weekly",
-      "weeklyExpiries": ["2026-11-17"],
-      "options": [
-        {"strike":81500,"type":"CE","bid":180,"ask":182,"ltp":181,"oi":12000,"volume":800,"iv":15.2},
-        {"strike":81500,"type":"PE","bid":175,"ask":177,"ltp":176,"oi":13000,"volume":900,"iv":15.5}
-      ]
-    }
-
-## Other free sources considered
-
-- indiaopt / BSE public-site wrappers: useful for research and EOD/option-chain inspection, but unofficial, subject to website changes and rate limits. The documented sample data focuses on LTP, OI, volume and IV; it does not establish executable bid/ask coverage. It is not used for paper fills.
-- Nubra: documents BSE option-chain snapshots and real-time streams, but requires an authenticated session. Its REST option-chain sample does not include bid/ask fields in the example response; order-book data is a separate feed. Free eligibility was not established, so it is not the default.
-- BSE official market-data products: BSE lists real-time, delayed, EOD and historical feeds. Confirm the current licence and tariff directly with BSE before using an official data feed.
-
-## Monitoring and safeguards
-
-- Polls during BSE weekday session, 09:15–15:30 Asia/Kolkata.
-- Poll interval defaults to 15 seconds and can be adjusted in the dashboard.
-- Evaluates the best call debit spread and put debit spread independently.
-- Simulates at most one paper position per day. No real order is placed.
-- Maximum debit risk is capped at ₹2,000.
-- Default exit: +25% of entry debit, -30%, or 15:20 IST.
-- Entry uses long ask and short bid. Exit uses long bid and short ask.
-- If quotes are missing, crossed or invalid, no recommendation or fabricated P&L is produced.
-- Daily HTML reports are written to reports/YYYY-MM-DD.html.
-
-## Keep the laptop awake
-
-The server requests an OS sleep inhibitor automatically on startup and releases it on shutdown:
-- Windows: SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED).
-- macOS: caffeinate.
-- Linux: systemd-inhibit.
-
-This prevents automatic system sleep while the server runs. The display may still turn off, and OS policy can still lock the screen.
+- Polls during the BSE weekday session, 09:15–15:30 Asia/Kolkata.
+- Poll interval defaults to 15 seconds.
+- Entry uses long ask and short bid; exit uses long bid and short ask.
+- Maximum simulated risk remains capped at ₹2,000 by default.
+- One simulated position at a time; no real orders are placed.
+- Missing or invalid quotes suppress signals and P&L updates.
+- Existing research, event tracking and paper-trade learning remain independent of the provider adapter.
