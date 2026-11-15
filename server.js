@@ -142,6 +142,10 @@ async function pollOnce() {
     if(active) {
       const outcome=evaluateExit(active,chain,new Date());
       if(outcome.action==="close") await closeTrade(active,outcome,chain);
+      else if(Number.isFinite(outcome.pnl)) await store.transact(state=>{
+        const current=state.trades.find(t=>t.id===active.id);
+        if(current&&current.status==="open"){current.currentCredit=outcome.credit;current.unrealizedPnl=outcome.pnl;current.lastMarkedAt=new Date().toISOString();}
+      });
     } else {
       const today=dateKey(), latest=store.snapshot();
       if(latest.lastTradeDate!==today) {
