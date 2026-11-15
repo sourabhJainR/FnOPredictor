@@ -12,7 +12,7 @@
   <section class="controls panel">
     <label>Underlying symbol<input id="symbol" value="SENSEX" maxlength="30" autocomplete="off"></label>
     <label>Expiry date<input id="expiry" type="date"></label>
-    <label>Lot size<input id="lot" type="number" min="1" value="20"></label>
+    <label>Contract lot size<input id="lot" type="number" min="1" placeholder="Required if feed omits it"></label>
     <label>Risk budget (₹)<input id="budget" type="number" min="1" value="10000"></label>
     <button id="refresh" class="primary">Refresh market data</button>
   </section>
