@@ -13,6 +13,10 @@ Official entry points:
 
 The public option-chain webpage is for viewing market data. Its browser XHR calls are not treated as a supported or licensed API. The application does not replay browser cookies, mimic browser sessions, scrape the page, or bypass access controls.
 
+## Supported transport boundary
+
+The current adapter supports an HTTPS JSON endpoint only. BSE also documents exchange market-data interfaces such as Direct NFCAST that use UDP datagrams and multicast delivery. If the selected BSE subscription provides NFCAST, MDI/EMDI or another binary stream rather than an HTTPS JSON API, this adapter cannot consume it directly; a separate protocol-specific receiver and decoder must be built from the exact BSE interface manual and tested in BSE's simulation environment. Do not point this HTTP adapter at a multicast address or claim the stream is connected.
+
 ## Configure the authorised feed
 
 After BSE approves the subscription and provides API access, copy `.env.example` to `.env` and set the exact HTTPS endpoint and token issued for the subscription:
