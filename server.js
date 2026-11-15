@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createStore } from "./lib/store.js";
 import { normalizeChain, buildSpreadCandidates, evaluateExit } from "./lib/strategy.js";
 import { powerStatus, setPowerInhibit, releasePowerInhibit } from "./lib/power.js";
+import { fetchUpstoxSensex } from "./lib/upstox.js";
 
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,7 @@ const ttlMs = Math.max(5_000, Number(process.env.CACHE_TTL_MS || 15_000));
 const pollDefault = Math.max(10, Number(process.env.POLL_SECONDS || 15));
 const store = createStore(path.join(root, "data", "state.json"));
 const sources = { quote: process.env.BSE_QUOTE_JSON_URL, chain: process.env.BSE_OPTION_CHAIN_JSON_URL };
+const upstox = { token: process.env.UPSTOX_ACCESS_TOKEN, instrumentKey: process.env.UPSTOX_INSTRUMENT_KEY || "BSE_INDEX|SENSEX" };
 const settings = {
   pollSeconds: pollDefault, capital: Number(process.env.CAPITAL_INR || 10000),
   riskLimit: Math.min(2000, Number(process.env.RISK_LIMIT_INR || 2000)),
@@ -102,8 +104,8 @@ async function pollOnce() {
   busy=true;
   try {
     if(!marketIsOpen()) {
-      providerStatus=!enabled?"monitoring-stopped":(sources.quote&&sources.chain?"outside-market-hours":"not-configured");
-      if(enabled&&(!sources.quote||!sources.chain))lastError="Configure BSE_QUOTE_JSON_URL and BSE_OPTION_CHAIN_JSON_URL in .env.";
+      providerStatus=!enabled?"monitoring-stopped":(upstox.token||(sources.quote&&sources.chain)?"outside-market-hours":"not-configured");
+      if(enabled&&!upstox.token&&(!sources.quote||!sources.chain))lastError="Set UPSTOX_ACCESS_TOKEN in .env, or configure approved custom quote and chain endpoints.";
       const p=localParts();
       if(Number(p.hour)>15 || (Number(p.hour)===15&&Number(p.minute)>=35)) {
         const today=dateKey(); if(!store.snapshot().reports.some(r=>r.date===today&&r.finalized)) await generateReport(today,true);
@@ -111,10 +113,17 @@ async function pollOnce() {
       return;
     }
     if(!enabled)return;
-    const [quote,chainResult]=await Promise.all([
-      fetchJson("quote",{symbol:"SENSEX"}),
-      fetchJson("chain",{symbol:"SENSEX",expiry:"nearest-weekly"})
-    ]);
+    let quote, chainResult;
+    if (upstox.token) {
+      const snapshot = await fetchUpstoxSensex({ accessToken: upstox.token, instrumentKey: upstox.instrumentKey });
+      quote = { status: "ok", source: "Upstox", data: snapshot.quote };
+      chainResult = { status: "ok", source: "Upstox", data: snapshot.chain };
+    } else {
+      [quote,chainResult] = await Promise.all([
+        fetchJson("quote",{symbol:"SENSEX"}),
+        fetchJson("chain",{symbol:"SENSEX",expiry:"nearest-weekly"})
+      ]);
+    }
     if(quote.status!=="ok"||chainResult.status!=="ok") {
       providerStatus=quote.status==="unconfigured"||chainResult.status==="unconfigured"?"not-configured":"error";
       lastError=[quote.message,chainResult.message].filter(Boolean).join(" ");
@@ -172,7 +181,7 @@ async function pollOnce() {
       }
     }
     providerStatus="connected";lastError="";
-    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source};});
+    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp"};});
   } catch(error) { providerStatus="error";lastError=error.message; }
   finally { busy=false; }
 }
@@ -208,7 +217,7 @@ app.get("/reports/:date.html",async(req,res)=>{
   try{res.type("html").send(await readFile(path.join(root,"reports",`${req.params.date}.html`),"utf8"));}
   catch{return res.status(404).send("Report not generated yet.");}
 });
-app.get("/api/status",(_req,res)=>res.json({app:"FnOPredictor",providers:{quote:sources.quote?"configured":"not-configured",optionChain:sources.chain?"configured":"not-configured"},monitoring:enabled,pollSeconds:settings.pollSeconds,power:powerStatus(),timezone:"Asia/Kolkata"}));
+app.get("/api/status",(_req,res)=>res.json({app:"FnOPredictor",providers:{primary:upstox.token?"upstox":"custom",quote:upstox.token||sources.quote?"configured":"not-configured",optionChain:upstox.token||sources.chain?"configured":"not-configured"},monitoring:enabled,pollSeconds:settings.pollSeconds,power:powerStatus(),timezone:"Asia/Kolkata"}));
 app.use(async(_req,res)=>{try{res.type("html").send(await readFile(path.join(root,"public","index.html")));}catch{res.status(404).send("Application assets not found.");}});
 
 await store.init();
