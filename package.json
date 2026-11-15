@@ -1,10 +1,20 @@
 {
   "name": "fno-predictor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Standalone BSE options spread analysis SPA",
+  "description": "Continuous BSE SENSEX options monitoring and paper-trading dashboard",
   "type": "module",
-  "scripts": { "start": "node server.js", "dev": "node --watch server.js", "test": "node --test" },
-  "engines": { "node": ">=20" },
-  "dependencies": { "express": "^5.1.0" }
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check lib/strategy.js && node --check lib/store.js && node --check lib/power.js && node --check public/monitor.js && node --check lib/bse.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "dotenv": "^16.4.7"
+  }
 }
