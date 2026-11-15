@@ -183,7 +183,7 @@ async function pollOnce() {
       }
     }
     providerStatus="connected";lastError="";
-    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp",features:snapshotFeatures(chain,timestamp)};});
+    await store.transact(s=>{s.lastMarket={spot:chain.spot,timestamp,expiry:selected,source:chain.source,timestampSource:chain.timestampSource||"provider_timestamp",features:snapshotFeatures(chain,timestamp),options:chain.options,candidates};});
   } catch(error) { providerStatus="error";lastError=error.message; }
   finally { busy=false; }
 }
