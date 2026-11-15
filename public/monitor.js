@@ -10,7 +10,7 @@ function renderCandidate(id, c, label) {
   <div class="legs-grid"><div><small>Buy at ask</small><strong>${money(c.buy)}</strong></div><div><small>Sell at bid</small><strong>${money(c.sell)}</strong></div><div><small>Net debit</small><strong>${money(c.debit)}</strong></div><div><small>Breakeven</small><strong>${number(c.breakeven)}</strong></div><div><small>Max risk</small><strong>${money(c.risk)}</strong></div><div><small>Max reward</small><strong>${money(c.reward)}</strong></div><div><small>Qty (lots)</small><strong>${c.quantity}</strong></div><div><small>Return / risk</small><strong>${number(c.rr*100,1)}%</strong></div></div>
   <p class="muted-copy">Expiry ${c.expiry||"not supplied"} · PCR ${number(c.pcr)} · ${c.calibratedWinRate===null?"Learning sample insufficient":`Observed win rate ${number(c.calibratedWinRate*100,1)}% (${c.side} sample)`}. Score is a ranking score, not a probability.</p>`;
 }
-function renderState(s) {
+function localDay(value){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));}\nfunction renderState(s) {
   const m=s.monitor||{};
   pill("monitorState",m.enabled?"Monitoring on":"Monitoring stopped",m.enabled?"good":"muted");
   pill("providerState",m.providerStatus||"Waiting for provider",m.providerStatus==="connected"?"good":"bad");
