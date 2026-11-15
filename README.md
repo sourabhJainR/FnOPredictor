@@ -35,7 +35,11 @@ The primary provider is the BSE Self Data Feed. BSE requires registration, KYC, 
 ```dotenv
 BSE_MARKET_DATA_URL=https://your-bse-issued-endpoint
 BSE_MARKET_DATA_TOKEN=your_bse_issued_token
+BSE_MARKET_DATA_AUTH_HEADER=Authorization
+BSE_MARKET_DATA_AUTH_SCHEME=Bearer
 ```
+
+Match the authentication header and scheme to the API manual BSE issues for your subscription.
 
 The app does not scrape BSE's public website or call undocumented browser XHR endpoints. Until BSE supplies an endpoint, credentials and the response contract, live monitoring remains `not-configured`; no synthetic or Upstox fallback is used. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
