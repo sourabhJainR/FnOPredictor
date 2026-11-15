@@ -73,7 +73,7 @@ app.get("/api/market", async (req, res) => {
   res.json({ symbol, quote, chain, retrievedAt: new Date().toISOString() });
 });
 
-app.get("*", async (_req, res) => {
+app.use(async (_req, res) => {
   try { res.type("html").send(await readFile(path.join(root, "public", "index.html"))); }
   catch { res.status(404).send("Application assets not found."); }
 });
