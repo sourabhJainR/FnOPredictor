@@ -20,7 +20,7 @@ The next algorithm families to add are RSI(14), MACD(12,26,9), Bollinger-band re
 
 ## Walk-forward evaluation
 
-Each signal records its strategy name, timestamp, input spot, direction, raw confidence, explanation and five-observation horizon. It is resolved only after five later snapshots exist. The outcome record stores the future spot, realized direction, return and Brier loss. This avoids scoring a forecast against the same snapshot used to create it.
+Each signal records its strategy name, timestamp, input spot, direction, raw confidence, explanation, recent news/event context tags and five-observation horizon. It is resolved only after five later snapshots exist. The outcome record stores the future spot, realized direction, return and Brier loss. This avoids scoring a forecast against the same snapshot used to create it.
 
 The leaderboard reports sample count, hit rate, average five-observation return, Brier score and distinct sessions. Momentum is the baseline. A challenger needs at least 50 resolved forecasts, 15 distinct sessions, lower Brier loss and higher average return than the baseline before it can be named research champion. A champion is still shadow research, not an automatic live-strategy change.
 
