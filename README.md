@@ -1,19 +1,41 @@
 # FnOPredictor
 
-A standalone single-page application for BSE options research and defined-risk spread analysis.
+A standalone single-page application for BSE options research and defined-risk debit spreads. It is independent of AUREN and any other runtime.
 
-## Project status
+## Current capabilities
 
-The repository was empty when this project was started. The application is being built as a separate product and does not require AUREN or another application runtime.
+- Bull call and bear put debit-spread candidates.
+- Spread legs priced using ask for buys and bid for sells, with clearly marked LTP fallback.
+- Maximum profit, maximum loss, breakeven, return/risk and position sizing against a risk budget.
+- Put/call open-interest ratio and an explainable heuristic ranking score.
+- Live-feed gateway with caching, source timestamps and stale-data suppression.
+- Manual normalized JSON import and synthetic sample mode for UI evaluation.
+- Responsive single-page dashboard; no order placement.
 
-## Data integrity
+## Start locally
 
-- Market prices and option-chain values must include source, exchange timestamp, retrieval time, and freshness status.
-- A provider is usable only when its access method and terms permit this use.
-- The application must never label delayed, cached, simulated, or manually entered values as live.
-- If no permitted live BSE feed is available, the UI must show that state and must not issue trade recommendations from stale data.
-- Public exchange pages are not assumed to be a free, unrestricted redistribution API.
+Requires Node.js 20 or later.
 
-## Risk
+```sh
+npm install
+cp .env.example .env
+npm start
+```
 
-This is an analytical tool, not investment advice or an order execution system. Spread calculations are estimates and exclude brokerage, taxes, slippage, and liquidity effects unless explicitly configured.
+Open http://localhost:3000.
+
+## Market data status
+
+**Live BSE data is not enabled by default.** Configure the two HTTPS JSON feed endpoints documented in [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md). The provider must permit your intended use and supply quote and option-chain fields. No third-party screener is scraped or represented as a free live API without documented permission.
+
+BSE publishes an option-chain page and sells market-data products. A public web page does not, by itself, grant unrestricted API or redistribution rights. If no authorized provider is configured, the app says so and does not claim live prices.
+
+## Option-chain schema
+
+The chain JSON contains `spot`, optional `lotSize`, `timestamp`, `source`, `expiry` and an `options` array. Each contract contains `strike`, `type` (`CE` or `PE`), `bid`, `ask`, `ltp`, `oi`, `volume` and `iv`. If the feed omits lot size, enter the current exchange contract lot size manually. Never assume it is constant across instruments or contract revisions.
+
+## Model and risk notes
+
+The displayed confidence is a **heuristic model score**, not a calibrated probability of profit or a backtested win rate. It uses directional context, put/call OI, liquidity and IV. The debit-spread payoff is defined-risk at expiry, but displayed estimates exclude brokerage, taxes, slippage, partial fills and early-exit effects. Confirm contract specifications and live bid/ask depth before acting.
+
+Synthetic sample data is for interface testing only. Manual and sample data are never labelled live. Snapshots older than two minutes suppress recommendations.
