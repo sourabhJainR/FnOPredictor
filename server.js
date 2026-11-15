@@ -191,7 +191,7 @@ function stateResponse() {
   const age=last?Date.now()-Date.parse(last.timestamp):Infinity;
   return {...state,learning:learningStats(state),monitor:{enabled,providerStatus,lastError,lastPoll:last?.timestamp||null,
     spot:last?.spot||null,expiry:last?.expiry||null,freshness:age<=30000?"Fresh":age<=120000?"Aging":last?"Stale":"No data",
-    marketOpen:marketIsOpen(),capital:settings.capital,riskLimit:settings.riskLimit,profitTargetPct:settings.profitTargetPct,
+    marketOpen:marketIsOpen(),source:last?.source||null,timestampSource:last?.timestampSource||"provider_timestamp",capital:settings.capital,riskLimit:settings.riskLimit,profitTargetPct:settings.profitTargetPct,
     lossLimitPct:settings.lossLimitPct,power:powerStatus(),
     predictions:age<=120000&&["connected","outside-market-hours","monitoring-stopped"].includes(providerStatus)?(state.predictions.slice(-1)[0]||null):null}};
 }
