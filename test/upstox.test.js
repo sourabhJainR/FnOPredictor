@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeUpstoxChain } from "../lib/upstox.js";
+import { normalizeUpstoxChain, fetchUpstoxSensex } from "../lib/upstox.js";
 
 const expiry = "2026-11-17";
 const contracts = [
@@ -39,4 +39,31 @@ test("Upstox adapter rejects mixed lot sizes", () => {
     () => normalizeUpstoxChain(rows, mixed, "2026-11-16T04:30:00.000Z"),
     /inconsistent lot sizes/
   );
+});
+
+test("Upstox fetcher requests weekly BSE chain with bearer auth", async () => {
+  const calls = [];
+  const responses = [
+    { status: "success", data: contracts },
+    { status: "success", data: rows }
+  ];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url: String(url), init });
+    const body = responses.shift();
+    return { ok: true, status: 200, json: async () => body };
+  };
+  const snapshot = await fetchUpstoxSensex({
+    accessToken: "test-token",
+    fetchImpl,
+    now: new Date("2026-11-16T04:30:00.000Z")
+  });
+  assert.equal(snapshot.chain.expiry, expiry);
+  assert.equal(snapshot.quote.spot, 81520);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(c => c.url.includes("BSE_INDEX%7CSENSEX") && c.url.includes("expiry_date=current_week")));
+  assert.ok(calls.every(c => c.init.headers.Authorization === "Bearer test-token"));
+});
+
+test("Upstox fetcher requires a configured token", async () => {
+  await assert.rejects(() => fetchUpstoxSensex({ accessToken: "" }), /UPSTOX_ACCESS_TOKEN/);
 });
