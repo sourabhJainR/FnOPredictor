@@ -20,12 +20,13 @@ Set:
 
 Quote response must be JSON with a numeric `spot` (or `ltp` / `lastPrice`) and optional ISO `timestamp`.
 
-Option-chain response must be JSON:
+Option-chain response must be JSON. Include `lotSize` when supplied by the provider; otherwise the user must enter the current contract lot size in the UI:
 ```json
 {
   "spot": 80000,
   "timestamp": "2026-11-15T09:30:00+05:30",
   "source": "Provider name",
+  "lotSize": 20,
   "expiry": "2026-11-26",
   "options": [
     {"strike":80000,"type":"CE","bid":120,"ask":125,"ltp":123,"oi":12000,"volume":800,"iv":14},
