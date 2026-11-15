@@ -18,6 +18,7 @@ function renderState(s) {
   $("providerMessage").textContent=m.lastError||"";
   pill("powerState",m.power?.active?"Sleep prevention active":"Sleep prevention inactive",m.power?.active?"good":"muted");
   $("spot").textContent=money(m.spot);
+  $("activeStrategy").textContent=m.activeResearchStrategy||"heuristic-baseline";
   $("expiry").textContent=m.expiry||"Awaiting chain";
   $("lastUpdate").textContent=m.lastPoll?new Date(m.lastPoll).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):"Not started";
   $("sourceInfo").textContent=m.source?`Source: ${m.source} | Timestamp: ${m.timestampSource==="retrieved_at"?"local retrieval time":"provider timestamp"}`:"Provider not connected";
@@ -44,7 +45,7 @@ function renderState(s) {
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 function renderResearch(r){
   $("researchStats").textContent="Snapshots "+(r.historyPoints||0)+" · Resolved forecasts "+(r.resolvedOutcomes||0)+" · Pending forecasts "+(r.pendingSignals||0);
-  $("championStatus").textContent=r.championStatus||"Research baseline is collecting evidence.";
+  $("championStatus").textContent=(r.championStatus||"Research baseline is collecting evidence.")+" Active paper selector: "+(r.validatedResearchChampion||"heuristic-baseline")+". "+(r.holdout?.reason||"");
   $("newsState").textContent=r.newsConfigured?(r.newsError?"News feed error":"News feeds connected"):"News feeds not configured";
   $("researchRows").innerHTML=(r.leaderboard||[]).map(x=>"<tr><td>"+escapeHtml(x.strategy)+"</td><td>"+x.samples+"</td><td>"+(x.winRate==null?"—":number(x.winRate*100,1)+"%")+"</td><td>"+(x.averageReturnPct==null?"—":number(x.averageReturnPct,3)+"%")+"</td><td>"+(x.brier==null?"—":number(x.brier,4))+"</td><td>"+x.sessions+"</td><td>"+(x.paperTrades||0)+"</td><td>"+(x.paperWinRate==null?"—":number(x.paperWinRate*100,1)+"%")+"</td><td>"+(x.paperReturnPct==null?"—":number(x.paperReturnPct,2)+"%")+"</td></tr>").join("")||'<tr><td colspan="9">Waiting for research observations.</td></tr>';
   $("eventFeed").innerHTML=(r.events||[]).slice(0,8).map(e=>"<p><strong>"+escapeHtml(e.title)+"</strong><br><small>"+escapeHtml(e.type)+" · "+escapeHtml(e.severity)+" · "+(e.timestamp?new Date(e.timestamp).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}):"")+"</small></p>").join("")||"No events recorded yet.";
