@@ -172,7 +172,11 @@ async function pollOnce() {
     } else {
       const today=dateKey(), latest=store.snapshot();
       if(latest.lastTradeDate!==today) {
-        const best=[candidates.call,candidates.put].filter(Boolean).sort((a,b)=>b.score-a.score)[0];
+        const adaptiveStrategy=latest.validatedResearchChampion;
+        const adaptiveSignal=adaptiveStrategy?latest.researchSignals?.filter(x=>x.strategy===adaptiveStrategy).at(-1):null;
+        const adaptiveFresh=adaptiveSignal&&Date.now()-Date.parse(adaptiveSignal.createdAt)<=120000;
+        const best=adaptiveFresh?(adaptiveSignal.direction==="up"?candidates.call:adaptiveSignal.direction==="down"?candidates.put:null)
+          :[candidates.call,candidates.put].filter(Boolean).sort((a,b)=>b.score-a.score)[0];
         if(best&&best.score>=60) {
           const trade={id:`paper-${Date.now()}`,side:best.side,longStrike:best.long.strike,shortStrike:best.short.strike,
             longType:best.long.type,shortType:best.short.type,entryDebit:best.debit,lotSize:lot,quantity:best.quantity,
@@ -194,7 +198,7 @@ function stateResponse() {
   return {...state,learning:learningStats(state),monitor:{enabled,providerStatus,lastError,lastPoll:last?.timestamp||null,
     spot:last?.spot||null,expiry:last?.expiry||null,freshness:age<=30000?"Fresh":age<=120000?"Aging":last?"Stale":"No data",
     marketOpen:marketIsOpen(),source:last?.source||null,timestampSource:last?.timestampSource||"provider_timestamp",capital:settings.capital,riskLimit:settings.riskLimit,profitTargetPct:settings.profitTargetPct,
-    lossLimitPct:settings.lossLimitPct,power:powerStatus(),
+    lossLimitPct:settings.lossLimitPct,activeResearchStrategy:state.validatedResearchChampion||"heuristic-baseline",power:powerStatus(),
     predictions:age<=120000&&["connected","outside-market-hours","monitoring-stopped"].includes(providerStatus)?(state.predictions.slice(-1)[0]||null):null}};
 }
 
