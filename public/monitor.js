@@ -14,7 +14,8 @@ function localDay(value){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/
 function renderState(s) {
   const m=s.monitor||{};
   pill("monitorState",m.enabled?"Monitoring on":"Monitoring stopped",m.enabled?"good":"muted");
-  pill("providerState",m.providerStatus||"Waiting for provider",m.providerStatus==="connected"?"good":"bad");\n  $("providerMessage").textContent=m.lastError||"";
+  pill("providerState",m.providerStatus||"Waiting for provider",m.providerStatus==="connected"?"good":"bad");
+  $("providerMessage").textContent=m.lastError||"";
   pill("powerState",m.power?.active?"Sleep prevention active":"Sleep prevention inactive",m.power?.active?"good":"muted");
   $("spot").textContent=money(m.spot);
   $("expiry").textContent=m.expiry||"Awaiting chain";
