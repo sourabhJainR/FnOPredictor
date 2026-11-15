@@ -20,10 +20,12 @@ After BSE approves the subscription and provides API access, copy `.env.example`
 ```dotenv
 BSE_MARKET_DATA_URL=https://the-exact-endpoint-provided-by-bse
 BSE_MARKET_DATA_TOKEN=the-token-provided-by-bse
+BSE_MARKET_DATA_AUTH_HEADER=Authorization
+BSE_MARKET_DATA_AUTH_SCHEME=Bearer
 POLL_SECONDS=15
 ```
 
-The token stays on the local server and is never sent to the browser or written to the trade ledger. Do not commit `.env` or paste credentials into chat.
+The token stays on the local server and is never sent to the browser or written to the trade ledger. The header name and scheme are configurable because BSE must confirm the exact authentication method for the selected feed. The defaults are `Authorization: Bearer`. Do not commit `.env` or paste credentials into chat.
 
 **Activation status:** code and contract tests are implemented, but a live BSE handshake cannot be claimed until the user has an authorised feed endpoint, credentials and the matching BSE response specification. The app stays `not-configured` when either endpoint or token is missing. It does not silently fall back to Upstox, Quantsapp, synthetic values or public-site scraping.
 
@@ -51,7 +53,7 @@ The adapter also accepts the common aliases `underlyingSpot`, `exchangeTimestamp
 
 ## Validation and failure behaviour
 
-- HTTPS endpoint and bearer-token authentication are mandatory.
+- HTTPS endpoint and authenticated access are mandatory. Configure the header name and scheme to match BSE's issued API manual; defaults are `Authorization: Bearer`.
 - A request times out after ten seconds.
 - Exchange timestamp, SENSEX spot, weekly expiry, expiry list and lot size are mandatory.
 - Bid and ask must be positive and non-crossed; bid/ask quantities must be positive for at least four contracts.
