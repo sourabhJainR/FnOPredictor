@@ -13,7 +13,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 3000);
 const pollDefault = Math.max(10, Number(process.env.POLL_SECONDS || 15));
 const store = createStore(path.join(root, "data", "state.json"));
-const bse = { endpoint: process.env.BSE_MARKET_DATA_URL, token: process.env.BSE_MARKET_DATA_TOKEN };
+const bse = { endpoint: process.env.BSE_MARKET_DATA_URL, token: process.env.BSE_MARKET_DATA_TOKEN, authHeader: process.env.BSE_MARKET_DATA_AUTH_HEADER || "Authorization", authScheme: process.env.BSE_MARKET_DATA_AUTH_SCHEME ?? "Bearer" };
 const settings = {
   pollSeconds: pollDefault, capital: Number(process.env.CAPITAL_INR || 10000),
   riskLimit: Math.min(2000, Number(process.env.RISK_LIMIT_INR || 2000)),
@@ -97,7 +97,7 @@ async function pollOnce() {
       lastError = "Configure BSE_MARKET_DATA_URL and BSE_MARKET_DATA_TOKEN from an authorised BSE data-feed subscription.";
       return;
     }
-    const snapshot = await fetchBseSensex({ endpoint: bse.endpoint, accessToken: bse.token });
+    const snapshot = await fetchBseSensex({ endpoint: bse.endpoint, accessToken: bse.token, authHeader: bse.authHeader, authScheme: bse.authScheme });
     const quote = { status: "ok", source: "BSE Self Data Feed", data: snapshot.quote };
     const chainResult = { status: "ok", source: "BSE Self Data Feed", data: snapshot.chain };
     const quoteAge=Date.now()-Date.parse(quote.data?.timestamp||"");
