@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
