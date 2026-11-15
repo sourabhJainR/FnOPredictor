@@ -44,6 +44,7 @@ test("BSE adapter accepts common exchange field aliases", () => {
 
 test("BSE adapter rejects missing or stale-format exchange timestamps", () => {
   assert.throws(() => normalizeBseSnapshot({ ...payload, timestamp: undefined }), /exchange timestamp/);
+  assert.throws(() => normalizeBseSnapshot({ ...payload, timestamp: "2026-11-16" }), /exchange timestamp/);
 });
 
 test("BSE adapter rejects non-weekly or unlisted expiry", () => {
@@ -109,4 +110,13 @@ test("BSE fetcher supports the authentication header issued by the exchange", as
   });
   assert.equal(headers["X-API-Key"], "api-key");
   assert.equal(headers.Authorization, undefined);
+});
+
+test("BSE fetcher redacts credentials echoed by an upstream error", async () => {
+  const fetchImpl = async () => ({
+    ok: false, status: 401, json: async () => ({ message: "Rejected secret-token" })
+  });
+  await assert.rejects(() => fetchBseSensex({
+    endpoint: "https://feed.example.test/data", accessToken: "secret-token", fetchImpl
+  }), error => error.message === "BSE market-data request failed: Rejected [redacted]");
 });
