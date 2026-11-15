@@ -90,17 +90,18 @@ async function closeTrade(trade,result,chain) {
   });
 }
 async function pollOnce() {
-  if(!enabled||busy)return;
+  if(busy)return;
   busy=true;
   try {
     if(!marketIsOpen()) {
-      providerStatus="outside-market-hours";
+      providerStatus=enabled?"outside-market-hours":"monitoring-stopped";
       const p=localParts();
       if(Number(p.hour)>15 || (Number(p.hour)===15&&Number(p.minute)>=35)) {
         const today=dateKey(); if(!store.snapshot().reports.some(r=>r.date===today)) await generateReport(today);
       }
       return;
     }
+    if(!enabled)return;
     const [quote,chainResult]=await Promise.all([
       fetchJson("quote",{symbol:"SENSEX"}),
       fetchJson("chain",{symbol:"SENSEX",expiry:"nearest-weekly"})
