@@ -95,7 +95,8 @@ async function pollOnce() {
   busy=true;
   try {
     if(!marketIsOpen()) {
-      providerStatus=enabled?"outside-market-hours":"monitoring-stopped";
+      providerStatus=!enabled?"monitoring-stopped":(sources.quote&&sources.chain?"outside-market-hours":"not-configured");
+      if(enabled&&(!sources.quote||!sources.chain))lastError="Configure BSE_QUOTE_JSON_URL and BSE_OPTION_CHAIN_JSON_URL in .env.";
       const p=localParts();
       if(Number(p.hour)>15 || (Number(p.hour)===15&&Number(p.minute)>=35)) {
         const today=dateKey(); if(!store.snapshot().reports.some(r=>r.date===today)) await generateReport(today);
