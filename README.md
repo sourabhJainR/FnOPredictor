@@ -30,7 +30,7 @@ Open http://localhost:3000. Keep the terminal/server running for continuous moni
 
 ## Live data
 
-Live data is not enabled by default. The BSE option-chain web page is not assumed to be an unrestricted JSON API. Configure an approved provider in `.env`. The chain endpoint must return the nearest weekly expiry, `expiryType: "weekly"`, `weeklyExpiries`, a provider timestamp, lot size, and executable bid/ask quotes. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
+Live data uses the native Upstox adapter when `UPSTOX_ACCESS_TOKEN` is configured. Upstox documents free market-data APIs and supports the BSE SENSEX option chain with bid/ask, OI, volume, IV and weekly-expiry metadata. An Upstox account and API token are required. The app records local retrieval time because the documented chain response has no exchange timestamp. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
 ## Risk and model limitations
 
