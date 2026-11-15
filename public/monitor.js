@@ -10,7 +10,8 @@ function renderCandidate(id, c, label) {
   <div class="legs-grid"><div><small>Buy at ask</small><strong>${money(c.buy)}</strong></div><div><small>Sell at bid</small><strong>${money(c.sell)}</strong></div><div><small>Net debit</small><strong>${money(c.debit)}</strong></div><div><small>Breakeven</small><strong>${number(c.breakeven)}</strong></div><div><small>Max risk</small><strong>${money(c.risk)}</strong></div><div><small>Max reward</small><strong>${money(c.reward)}</strong></div><div><small>Qty (lots)</small><strong>${c.quantity}</strong></div><div><small>Return / risk</small><strong>${number(c.rr*100,1)}%</strong></div></div>
   <p class="muted-copy">Expiry ${c.expiry||"not supplied"} · PCR ${number(c.pcr)} · ${c.calibratedWinRate===null?"Learning sample insufficient":`Observed win rate ${number(c.calibratedWinRate*100,1)}% (${c.side} sample)`}. Score is a ranking score, not a probability.</p>`;
 }
-function localDay(value){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));}\nfunction renderState(s) {
+function localDay(value){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(value));}
+function renderState(s) {
   const m=s.monitor||{};
   pill("monitorState",m.enabled?"Monitoring on":"Monitoring stopped",m.enabled?"good":"muted");
   pill("providerState",m.providerStatus||"Waiting for provider",m.providerStatus==="connected"?"good":"bad");
@@ -29,10 +30,11 @@ function localDay(value){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/
   const t=s.trades||[];
   const active=t.find(x=>x.status==="open");
   $("activeTrade").innerHTML=active?`<strong>${active.side.toUpperCase()} spread · ${active.longStrike}/${active.shortStrike}</strong><span>Entry debit ${money(active.entryDebit)} · Opened ${new Date(active.openedAt).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"})} IST</span>`:"No active paper position";
-  const closed=t.filter(x=>x.status==="closed");
-  const pnl=closed.reduce((a,x)=>a+(x.realizedPnl||0),0);
+  const today=localDay(new Date());
+  const closedToday=t.filter(x=>x.status==="closed"&&localDay(x.closedAt)===today);
+  const pnl=closedToday.reduce((a,x)=>a+(x.realizedPnl||0),0);
   $("dailyPnl").textContent=money(pnl);
-  $("tradeCount").textContent=String(closed.length);
+  $("tradeCount").textContent=String(closedToday.length);
   $("tradeRows").innerHTML=t.slice(-20).reverse().map(x=>`<tr><td>${new Date(x.openedAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"})}</td><td>${x.side.toUpperCase()}</td><td>${x.longStrike}/${x.shortStrike}</td><td>${x.status}</td><td>${money(x.realizedPnl)}</td><td>${x.exitReason||"—"}</td></tr>`).join("")||'<tr><td colspan="6">No paper trades recorded.</td></tr>';
   $("modelStats").textContent=`Predictions ${s.predictions?.length||0} · Call outcomes ${s.learning?.call?.count||0} · Put outcomes ${s.learning?.put?.count||0}`;
   $("reportLinks").innerHTML=(s.reports||[]).slice(-10).reverse().map(r=>`<a href="/reports/${encodeURIComponent(r.date)}.html" target="_blank">${r.date} report</a>`).join(" · ")||"Reports are created after the market close.";
