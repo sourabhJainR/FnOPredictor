@@ -22,7 +22,7 @@ Requires Node.js 20 or later.
 ```sh
 npm install
 cp .env.example .env
-# Configure approved BSE quote and option-chain HTTPS endpoints
+# Add the endpoint and token supplied by BSE to .env
 npm start
 ```
 
@@ -30,7 +30,15 @@ Open http://localhost:3000. Keep the terminal/server running for continuous moni
 
 ## Live data
 
-Live data uses the native Upstox adapter when `UPSTOX_ACCESS_TOKEN` is configured. Upstox documents free market-data APIs and supports the BSE SENSEX option chain with bid/ask, OI, volume, IV and weekly-expiry metadata. An Upstox account and free one-year read-only Analytics Token are required. No static IP is needed for market-data APIs. The app records local retrieval time because the documented chain response has no exchange timestamp. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
+The primary provider is the BSE Self Data Feed. BSE requires registration, KYC, a selected data plan, a signed agreement and payment or trial access before issuing feed details. Configure the exact HTTPS API endpoint and token supplied by BSE in `.env`:
+
+```dotenv
+BSE_MARKET_DATA_URL=https://your-bse-issued-endpoint
+BSE_MARKET_DATA_TOKEN=your_bse_issued_token
+```
+
+The app does not scrape BSE's public website or call undocumented browser XHR endpoints. Until BSE supplies an endpoint, credentials and the response contract, live monitoring remains `not-configured`; no synthetic or Upstox fallback is used. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
+
 
 ## Risk and model limitations
 
