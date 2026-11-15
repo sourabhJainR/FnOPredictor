@@ -1,16 +1,19 @@
 # FnOPredictor
 
-A standalone single-page application for BSE options research and defined-risk debit spreads. It is independent of AUREN and any other runtime.
+A standalone local-first BSE SENSEX options monitoring and paper-trading dashboard. It is independent of AUREN and any other runtime.
 
-## Current capabilities
+## Capabilities
 
-- Bull call and bear put debit-spread candidates.
-- Spread legs priced using ask for buys and bid for sells, with clearly marked LTP fallback.
-- Maximum profit, maximum loss, breakeven, return/risk and position sizing against a risk budget.
-- Put/call open-interest ratio and an explainable heuristic ranking score.
-- Live-feed gateway with caching, source timestamps and stale-data suppression.
-- Manual normalized JSON import and synthetic sample mode for UI evaluation.
-- Responsive single-page dashboard; no order placement.
+- Continuous SENSEX quote and nearest-weekly option-chain monitoring during the BSE weekday session.
+- Best executable Bull Call Debit Spread and Bear Put Debit Spread recommendations.
+- Buy legs priced at ask and sell legs priced at bid; no LTP-only auto-trading signals.
+- Defined-risk sizing, one simulated position per day and a maximum risk cap of ₹2,000.
+- Paper exit rules: +25% debit profit target, -30% debit loss limit, or 15:20 IST time exit.
+- Persistent prediction and paper-trade ledger with realized simulated P&L.
+- Outcome-based score calibration after at least 20 closed paper trades per side.
+- Daily HTML report at `/reports/YYYY-MM-DD.html`.
+- Automatic OS sleep prevention while the server runs.
+- No order placement, no naked option selling and no averaging.
 
 ## Start locally
 
@@ -19,23 +22,18 @@ Requires Node.js 20 or later.
 ```sh
 npm install
 cp .env.example .env
+# Configure approved BSE quote and option-chain HTTPS endpoints
 npm start
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. Keep the terminal/server running for continuous monitoring. The app writes state to `data/state.json` and reports to `reports/`.
 
-## Market data status
+## Live data
 
-**Live BSE data is not enabled by default.** Configure the two HTTPS JSON feed endpoints documented in [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md). The provider must permit your intended use and supply quote and option-chain fields. No third-party screener is scraped or represented as a free live API without documented permission.
+Live data is not enabled by default. The BSE option-chain web page is not assumed to be an unrestricted JSON API. Configure an approved provider in `.env`. The chain endpoint must return the nearest weekly expiry, `expiryType: "weekly"`, `weeklyExpiries`, a provider timestamp, lot size, and executable bid/ask quotes. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
-BSE publishes an option-chain page and sells market-data products. A public web page does not, by itself, grant unrestricted API or redistribution rights. If no authorized provider is configured, the app says so and does not claim live prices.
+## Risk and model limitations
 
-## Option-chain schema
+All trades are simulated. The application does not submit orders. The ₹10,000 capital and ₹2,000 maximum risk defaults preserve the configured research limits. It simulates only one defined-risk spread at a time. Exit thresholds are defaults and can be changed in the dashboard.
 
-The chain JSON contains `spot`, optional `lotSize`, `timestamp`, `source`, `expiry` and an `options` array. Each contract contains `strike`, `type` (`CE` or `PE`), `bid`, `ask`, `ltp`, `oi`, `volume` and `iv`. If the feed omits lot size, enter the current exchange contract lot size manually. Never assume it is constant across instruments or contract revisions.
-
-## Model and risk notes
-
-The displayed confidence is a **heuristic model score**, not a calibrated probability of profit or a backtested win rate. It uses directional context, put/call OI, liquidity and IV. The debit-spread payoff is defined-risk at expiry, but displayed estimates exclude brokerage, taxes, slippage, partial fills and early-exit effects. Confirm contract specifications and live bid/ask depth before acting.
-
-Synthetic sample data is for interface testing only. Manual and sample data are never labelled live. Snapshots older than two minutes suppress recommendations.
+The ranking score is not a probability of profit. Outcome calibration uses the app's own paper ledger and should not be treated as independent validation. Paper fills exclude brokerage, taxes, market impact, queue priority and partial fills. Real market data, contract specifications and holiday calendars must be verified before using any recommendation.
