@@ -36,7 +36,7 @@ function renderState(s) {
   const pnl=closedToday.reduce((a,x)=>a+(x.realizedPnl||0),0);
   $("dailyPnl").textContent=money(pnl);
   $("tradeCount").textContent=String(closedToday.length);
-  $("tradeRows").innerHTML=t.slice(-20).reverse().map(x=>`<tr><td>${new Date(x.openedAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"})}</td><td>${x.side.toUpperCase()}</td><td>${x.longStrike}/${x.shortStrike}</td><td>${x.status}</td><td>${money(x.realizedPnl)}</td><td>${x.exitReason||"—"}</td></tr>`).join("")||'<tr><td colspan="6">No paper trades recorded.</td></tr>';
+  $("tradeRows").innerHTML=t.slice(-20).reverse().map(x=>`<tr><td>${new Date(x.openedAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata"})}</td><td>${x.side.toUpperCase()}</td><td>${x.longStrike}/${x.shortStrike}</td><td>${x.status}</td><td>${money(x.status==="open"?x.unrealizedPnl:x.realizedPnl)}</td><td>${x.exitReason||"—"}</td></tr>`).join("")||'<tr><td colspan="6">No paper trades recorded.</td></tr>';
   $("modelStats").textContent=`Predictions ${s.predictions?.length||0} · Call outcomes ${s.learning?.call?.count||0} · Put outcomes ${s.learning?.put?.count||0}`;
   $("reportLinks").innerHTML=(s.reports||[]).slice(-10).reverse().map(r=>`<a href="/reports/${encodeURIComponent(r.date)}.html" target="_blank">${r.date} report</a>`).join(" · ")||"Reports are created after the market close.";
 }
