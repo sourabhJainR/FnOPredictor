@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
-const money = (n) => Number.isFinite(Number(n)) ? "₹" + Number(n).toLocaleString("en-IN",{maximumFractionDigits:2}) : "—";
-const number = (n,d=2) => Number.isFinite(Number(n)) ? Number(n).toLocaleString("en-IN",{maximumFractionDigits:d}) : "—";
+const money = (n) => n!==null&&n!==undefined&&n!==""&&Number.isFinite(Number(n)) ? "₹" + Number(n).toLocaleString("en-IN",{maximumFractionDigits:2}) : "—";
+const number = (n,d=2) => n!==null&&n!==undefined&&n!==""&&Number.isFinite(Number(n)) ? Number(n).toLocaleString("en-IN",{maximumFractionDigits:d}) : "—";
 let timer = null;
 function pill(id, text, state="muted"){const el=$(id);el.textContent=text;el.className="pill "+state;}
 function renderCandidate(id, c, label) {
@@ -30,7 +30,7 @@ function renderState(s) {
   $("stopRule").textContent="-"+(m.lossLimitPct??30)+"%";
   const t=s.trades||[];
   const active=t.find(x=>x.status==="open");
-  $("activeTrade").innerHTML=active?`<strong>${active.side.toUpperCase()} spread · ${active.longStrike}/${active.shortStrike}</strong><span>Entry debit ${money(active.entryDebit)} · Opened ${new Date(active.openedAt).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"})} IST</span>`:"No active paper position";
+  $("activeTrade").innerHTML=active?`<strong>${active.side.toUpperCase()} spread · ${active.longStrike}/${active.shortStrike}</strong><span>Entry debit ${money(active.entryDebit)} · Opened ${new Date(active.openedAt).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"})} IST · Unrealized P&amp;L ${money(active.unrealizedPnl)}</span>`:"No active paper position";
   const today=localDay(new Date());
   const closedToday=t.filter(x=>x.status==="closed"&&localDay(x.closedAt)===today);
   const pnl=closedToday.reduce((a,x)=>a+(x.realizedPnl||0),0);
