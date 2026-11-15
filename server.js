@@ -73,11 +73,16 @@ function makeReportHtml(date,state) {
   const signals=predictions.slice(-100).map(p=>`<tr><td>${esc(new Date(p.timestamp).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"}))}</td><td>${esc(p.expiry)}</td><td>${esc(p.call? p.call.long.strike+"/"+p.call.short.strike:"No call spread")}</td><td>${esc(p.put? p.put.long.strike+"/"+p.put.short.strike:"No put spread")}</td></tr>`).join("");
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FnOPredictor report ${date}</title><style>body{font:15px/1.5 system-ui;max-width:1100px;margin:36px auto;padding:0 18px;color:#172033}h1{margin-bottom:4px}.muted{color:#667085}.metric{display:inline-block;padding:14px 20px;margin:12px 12px 12px 0;background:#f2f5fa;border-radius:8px}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{text-align:left;padding:9px;border-bottom:1px solid #ddd}small{color:#667085}</style><h1>FnOPredictor daily report</h1><p class="muted">BSE SENSEX · ${date} · Paper-trading results only</p><div class="metric"><small>Realized paper P&amp;L</small><h2>₹${pnl.toFixed(2)}</h2></div><div class="metric"><small>Closed paper trades</small><h2>${trades.filter(t=>t.status==="closed").length}</h2></div><div class="metric"><small>Recorded predictions</small><h2>${predictions.length}</h2></div><h2>Trade ledger</h2><table><thead><tr><th>Side</th><th>Spread</th><th>Status</th><th>Realized P&amp;L</th><th>Last unrealized P&amp;L</th><th>Exit reason</th></tr></thead><tbody>${rows||"<tr><td colspan='6'>No paper trades today.</td></tr>"}</tbody></table><h2>Prediction observations</h2><table><thead><tr><th>Time IST</th><th>Expiry</th><th>Call pair</th><th>Put pair</th></tr></thead><tbody>${signals||"<tr><td colspan='4'>No fresh predictions recorded.</td></tr>"}</tbody></table><p class="muted"><small>Signals are model outputs, not guaranteed outcomes. Paper fills use quoted bid/ask and exclude brokerage, taxes, market impact and partial fills. This report is not a contract note.</small></p></html>`;
 }
-async function generateReport(date=dateKey()) {
+async function generateReport(date=dateKey(),finalized=false) {
   const state=store.snapshot(), dir=path.join(root,"reports");
   await mkdir(dir,{recursive:true});
   await writeFile(path.join(dir,`${date}.html`),makeReportHtml(date,state),"utf8");
-  await store.transact(s=>{if(!s.reports.some(r=>r.date===date))s.reports.push({date,createdAt:new Date().toISOString()});s.reports=s.reports.slice(-90);});
+  await store.transact(s=>{
+    const existing=s.reports.find(r=>r.date===date);
+    if(existing){existing.createdAt=new Date().toISOString();existing.finalized=existing.finalized||finalized;}
+    else s.reports.push({date,createdAt:new Date().toISOString(),finalized});
+    s.reports=s.reports.slice(-90);
+  });
   return date;
 }
 async function closeTrade(trade,result,chain) {
@@ -101,7 +106,7 @@ async function pollOnce() {
       if(enabled&&(!sources.quote||!sources.chain))lastError="Configure BSE_QUOTE_JSON_URL and BSE_OPTION_CHAIN_JSON_URL in .env.";
       const p=localParts();
       if(Number(p.hour)>15 || (Number(p.hour)===15&&Number(p.minute)>=35)) {
-        const today=dateKey(); if(!store.snapshot().reports.some(r=>r.date===today)) await generateReport(today);
+        const today=dateKey(); if(!store.snapshot().reports.some(r=>r.date===today&&r.finalized)) await generateReport(today,true);
       }
       return;
     }
