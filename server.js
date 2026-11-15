@@ -69,9 +69,9 @@ function makeReportHtml(date,state) {
   const trades=state.trades.filter(t=>(t.openedAt&&localDay(t.openedAt)===date)||(t.closedAt&&localDay(t.closedAt)===date));
   const predictions=state.predictions.filter(p=>p.timestamp&&localDay(p.timestamp)===date);
   const pnl=trades.filter(t=>t.status==="closed").reduce((s,t)=>s+Number(t.realizedPnl||0),0);
-  const rows=trades.map(t=>`<tr><td>${esc(t.side)}</td><td>${esc(t.longStrike)} / ${esc(t.shortStrike)}</td><td>${esc(t.status)}</td><td>₹${Number(t.realizedPnl||0).toFixed(2)}</td><td>${esc(t.exitReason||"Open / not exited")}</td></tr>`).join("");
+  const rows=trades.map(t=>`<tr><td>${esc(t.side)}</td><td>${esc(t.longStrike)} / ${esc(t.shortStrike)}</td><td>${esc(t.status)}</td><td>₹${Number(t.realizedPnl||0).toFixed(2)}</td><td>₹${Number(t.unrealizedPnl||0).toFixed(2)}</td><td>${esc(t.exitReason||"Open / not exited")}</td></tr>`).join("");
   const signals=predictions.slice(-100).map(p=>`<tr><td>${esc(new Date(p.timestamp).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata"}))}</td><td>${esc(p.expiry)}</td><td>${esc(p.call? p.call.long.strike+"/"+p.call.short.strike:"No call spread")}</td><td>${esc(p.put? p.put.long.strike+"/"+p.put.short.strike:"No put spread")}</td></tr>`).join("");
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FnOPredictor report ${date}</title><style>body{font:15px/1.5 system-ui;max-width:1100px;margin:36px auto;padding:0 18px;color:#172033}h1{margin-bottom:4px}.muted{color:#667085}.metric{display:inline-block;padding:14px 20px;margin:12px 12px 12px 0;background:#f2f5fa;border-radius:8px}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{text-align:left;padding:9px;border-bottom:1px solid #ddd}small{color:#667085}</style><h1>FnOPredictor daily report</h1><p class="muted">BSE SENSEX · ${date} · Paper-trading results only</p><div class="metric"><small>Realized paper P&amp;L</small><h2>₹${pnl.toFixed(2)}</h2></div><div class="metric"><small>Closed paper trades</small><h2>${trades.filter(t=>t.status==="closed").length}</h2></div><div class="metric"><small>Recorded predictions</small><h2>${predictions.length}</h2></div><h2>Trade ledger</h2><table><thead><tr><th>Side</th><th>Spread</th><th>Status</th><th>Realized P&amp;L</th><th>Exit reason</th></tr></thead><tbody>${rows||"<tr><td colspan='5'>No paper trades today.</td></tr>"}</tbody></table><h2>Prediction observations</h2><table><thead><tr><th>Time IST</th><th>Expiry</th><th>Call pair</th><th>Put pair</th></tr></thead><tbody>${signals||"<tr><td colspan='4'>No fresh predictions recorded.</td></tr>"}</tbody></table><p class="muted"><small>Signals are model outputs, not guaranteed outcomes. Paper fills use quoted bid/ask and exclude brokerage, taxes, market impact and partial fills. This report is not a contract note.</small></p></html>`;
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FnOPredictor report ${date}</title><style>body{font:15px/1.5 system-ui;max-width:1100px;margin:36px auto;padding:0 18px;color:#172033}h1{margin-bottom:4px}.muted{color:#667085}.metric{display:inline-block;padding:14px 20px;margin:12px 12px 12px 0;background:#f2f5fa;border-radius:8px}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{text-align:left;padding:9px;border-bottom:1px solid #ddd}small{color:#667085}</style><h1>FnOPredictor daily report</h1><p class="muted">BSE SENSEX · ${date} · Paper-trading results only</p><div class="metric"><small>Realized paper P&amp;L</small><h2>₹${pnl.toFixed(2)}</h2></div><div class="metric"><small>Closed paper trades</small><h2>${trades.filter(t=>t.status==="closed").length}</h2></div><div class="metric"><small>Recorded predictions</small><h2>${predictions.length}</h2></div><h2>Trade ledger</h2><table><thead><tr><th>Side</th><th>Spread</th><th>Status</th><th>Realized P&amp;L</th><th>Last unrealized P&amp;L</th><th>Exit reason</th></tr></thead><tbody>${rows||"<tr><td colspan='6'>No paper trades today.</td></tr>"}</tbody></table><h2>Prediction observations</h2><table><thead><tr><th>Time IST</th><th>Expiry</th><th>Call pair</th><th>Put pair</th></tr></thead><tbody>${signals||"<tr><td colspan='4'>No fresh predictions recorded.</td></tr>"}</tbody></table><p class="muted"><small>Signals are model outputs, not guaranteed outcomes. Paper fills use quoted bid/ask and exclude brokerage, taxes, market impact and partial fills. This report is not a contract note.</small></p></html>`;
 }
 async function generateReport(date=dateKey()) {
   const state=store.snapshot(), dir=path.join(root,"reports");
@@ -113,6 +113,10 @@ async function pollOnce() {
       lastError=[quote.message,chainResult.message].filter(Boolean).join(" ");
       return;
     }
+    const quoteAge=Date.now()-Date.parse(quote.data?.timestamp||"");
+    const chainAge=Date.now()-Date.parse(chainResult.data?.timestamp||"");
+    if(!validIso(quote.data?.timestamp)||!validIso(chainResult.data?.timestamp)||quoteAge < -30000||chainAge < -30000||quoteAge > 120000||chainAge > 120000)
+      throw new Error("Both quote and option-chain timestamps must be valid and no older than two minutes.");
     const chain=normalizeChain(chainResult.data,quote.data,"live");
     const weekly=Array.isArray(chainResult.data.weeklyExpiries)?chainResult.data.weeklyExpiries:[];
     const todayKey=dateKey();
@@ -136,7 +140,8 @@ async function pollOnce() {
         s.predictions=s.predictions.slice(-5000);
       });
     }
-    const fresh=Date.now()-Date.parse(timestamp)<=120000;
+    const age=Date.now()-Date.parse(timestamp);
+    const fresh=age>=-30000&&age<=120000;
     if(!fresh)throw new Error("Provider snapshot is older than two minutes; no signal or trade update.");
     const active=store.snapshot().trades.find(t=>t.status==="open");
     if(active) {
