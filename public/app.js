@@ -9,7 +9,7 @@ function normalize(raw, mode="manual") {
   const clean = options.map(o => ({strike:Number(o.strike),type:String(o.type||"").toUpperCase(),bid:Number(o.bid),ask:Number(o.ask),ltp:Number(o.ltp),oi:Number(o.oi||0),volume:Number(o.volume||0),iv:Number(o.iv||0)}))
     .filter(o=>Number.isFinite(o.strike)&&["CE","PE"].includes(o.type)&&[o.bid,o.ask,o.ltp].some(v=>Number.isFinite(v)&&v>0));
   if (!validNum(raw.spot) || Number(raw.spot)<=0 || clean.length<4) throw new Error("Snapshot needs a positive spot price and at least four valid option contracts.");
-  return {spot:Number(raw.spot),timestamp:raw.timestamp||new Date().toISOString(),source:raw.source||"Manual snapshot",expiry:raw.expiry||"",options:clean,mode};
+  return {spot:Number(raw.spot),lotSize:Number(raw.lotSize)||null,timestamp:raw.timestamp||new Date().toISOString(),source:raw.source||"Manual snapshot",expiry:raw.expiry||"",options:clean,mode};
 }
 function quote(o, side) {
   const v = side==="buy" ? o.ask : o.bid;
@@ -32,8 +32,10 @@ function buildCandidates(data, lot, budget) {
       if (!buy||!sell) continue;
       const debit=buy.price-sell.price;
       if (debit<=0||debit>=width) continue;
-      const maxProfit=(width-debit)*lot, maxLoss=debit*lot;
-      if (maxLoss>budget) continue;
+      const perLotMaxProfit=(width-debit)*lot, perLotMaxLoss=debit*lot;
+      if (perLotMaxLoss>budget) continue;
+      const contracts=Math.max(1,Math.floor(budget/perLotMaxLoss));
+      const maxProfit=perLotMaxProfit*contracts, maxLoss=perLotMaxLoss*contracts;
       const breakeven=bull?long.strike+debit:long.strike-debit;
       const directional = bull ? (data.spot>long.strike ? .8 : data.spot>short.strike ? .65 : .35) : (data.spot<long.strike ? .8 : data.spot<short.strike ? .65 : .35);
       const oiSignal = bull ? Math.min(1,Math.max(0.25,pcr/1.5)) : Math.min(1,Math.max(.25,1.5/Math.max(.1,pcr)));
@@ -41,18 +43,18 @@ function buildCandidates(data, lot, budget) {
       const ivPenalty=Math.min(.25,Math.max(0,((long.iv+short.iv)/2-18)/100));
       const score=Math.round(Math.max(1,Math.min(95,100*(.42*directional+.28*oiSignal+.30*liq-ivPenalty))));
       const rr=maxProfit/maxLoss;
-      candidates.push({name:bull?"Bull Call Spread":"Bear Put Spread",bias:bull?"Bullish":"Bearish",long,short,buy,sell,width,debit,maxProfit,maxLoss,breakeven,score,rr,indicative:buy.indicative||sell.indicative,lot,contracts:Math.floor(budget/maxLoss),reasons:[bull?"Call debit spread benefits from an upward move.":"Put debit spread benefits from a downward move.",`PCR ${fmt(pcr,2)}; liquidity score ${fmt(liq*100,0)}%.`,`Estimated max return on risk ${fmt(rr*100,1)}% before costs.`]});
+      candidates.push({name:bull?"Bull Call Spread":"Bear Put Spread",bias:bull?"Bullish":"Bearish",long,short,buy,sell,width,debit,maxProfit,maxLoss,breakeven,score,rr,indicative:buy.indicative||sell.indicative,lot,contracts,reasons:[bull?"Call debit spread benefits from an upward move.":"Put debit spread benefits from a downward move.",`PCR ${fmt(pcr,2)}; liquidity score ${fmt(liq*100,0)}%.`,`Estimated max return on risk ${fmt(rr*100,1)}% before costs.`]});
     }
   }
   return {pcr,candidates:candidates.sort((a,b)=>b.score-a.score).slice(0,8)};
 }
 function render() {
   if (!snapshot) return;
-  const lot=Math.max(1,Number($("lot").value)||1), budget=Math.max(1,Number($("budget").value)||1);
+  const lot=Number(snapshot.lotSize||$("lot").value), budget=Math.max(1,Number($("budget").value)||1);
   const age=Math.max(0,Date.now()-new Date(snapshot.timestamp).getTime());
   const stale=!Number.isFinite(age)||age>120000;
-  const {pcr,candidates:ranked}=buildCandidates(snapshot,lot,budget);
-  const candidates=stale?[]:ranked;
+  const {pcr,candidates:ranked}=Number.isFinite(lot)&&lot>0?buildCandidates(snapshot,lot,budget):{pcr:0,candidates:[]};
+  const candidates=stale||!Number.isFinite(lot)||lot<=0?[]:ranked;
   $("spot").textContent=money(snapshot.spot);
   $("pcr").textContent=fmt(pcr,2);
   $("quoteStamp").textContent=`Source: ${snapshot.source}`;
@@ -60,7 +62,7 @@ function render() {
   $("freshness").textContent=stale?"Stale":age<30000?"Fresh":"Aging";
   $("bias").textContent=pcr>1.15?"Bullish":pcr<.85?"Bearish":"Neutral";
   $("biasDetail").textContent=`PCR-based context; not a standalone signal`;
-  $("modelState").textContent=stale?"Stale data - no recommendations":candidates.length?"Indicative model output":"No qualifying spreads";
+  $("modelState").textContent=stale?"Stale data - no recommendations":!Number.isFinite(lot)||lot<=0?"Enter contract lot size":candidates.length?"Indicative model output":"No qualifying spreads";
   $("modelState").className="pill "+(candidates.length?"good":"muted");
   $("status").textContent=`${snapshot.mode==="live"?"Provider feed":snapshot.mode==="sample"?"Synthetic sample":"Manual snapshot"} · ${snapshot.source} · ${stale?"Snapshot older than 2 minutes; recommendations suppressed":"Timestamp checked"} · ${snapshot.options.length} contracts`;
   $("status").className="notice";
@@ -100,7 +102,7 @@ $("chainFile").addEventListener("change",async e=>{
 $("loadSample").addEventListener("click",()=>{
   const spot=80000, strikes=[79000,79500,80000,80500,81000], options=[];
   for(const k of strikes){const d=Math.abs(spot-k); options.push({strike:k,type:"CE",bid:Math.max(20,440-d*.38),ask:Math.max(25,450-d*.38),ltp:Math.max(22,445-d*.38),oi:9000+Math.round(Math.random()*8000),volume:1500,iv:16});options.push({strike:k,type:"PE",bid:Math.max(20,430-d*.38),ask:Math.max(25,440-d*.38),ltp:Math.max(22,435-d*.38),oi:9000+Math.round(Math.random()*8000),volume:1400,iv:17});}
-  snapshot=normalize({spot,timestamp:new Date().toISOString(),source:"Synthetic sample (not market data)",options},"sample"); render(); $("connection").textContent="Sample data"; $("connection").className="pill muted"; $("status").textContent="Synthetic sample only. Do not use these values for trading.";
+  snapshot=normalize({spot,lotSize:20,timestamp:new Date().toISOString(),source:"Synthetic sample (not market data)",options},"sample"); render(); $("connection").textContent="Sample data"; $("connection").className="pill muted"; $("status").textContent="Synthetic sample only. Do not use these values for trading.";
 });
 async function init(){
   try {const s=await (await fetch("/api/status")).json();const configured=s.providers.quote==="configured"&&s.providers.optionChain==="configured";$("connection").textContent=configured?"Feeds configured":"Feeds not configured";$("connection").className="pill "+(configured?"good":"muted");}
