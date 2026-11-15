@@ -111,7 +111,7 @@ async function pollOnce() {
     }
     const chain=normalizeChain(chainResult.data,quote.data,"live");
     const weekly=Array.isArray(chainResult.data.weeklyExpiries)?chainResult.data.weeklyExpiries:[];
-    const selected=weekly.map(String).filter(validIso).sort().find(x=>new Date(x).setHours(0,0,0,0)>=new Date().setHours(0,0,0,0));
+    const todayKey=dateKey();\n    const selected=weekly.map(String).filter(validIso).sort().find(x=>x.slice(0,10)>=todayKey);
     if(!selected||String(chainResult.data.expiry||"")!==selected||String(chainResult.data.expiryType||"").toLowerCase()!=="weekly") {
       providerStatus="invalid-expiry";
       lastError="Provider must return the nearest weekly expiry, weeklyExpiries and expiryType=weekly. Recommendations suppressed.";
@@ -121,7 +121,7 @@ async function pollOnce() {
     const lot=chain.lotSize||settings.lotSize;
     if(!lot||lot<=0)throw new Error("SENSEX lot size missing; configure it from current contract specifications.");
     const state=store.snapshot(), learning=learningStats(state);
-    const candidates=buildSpreadCandidates(chain,lot,settings.riskLimit,learning);
+    const effectiveRisk=Math.min(settings.riskLimit,settings.capital);\n    const candidates=buildSpreadCandidates(chain,lot,effectiveRisk,learning);
     const timestamp=chain.timestamp;
     if(state.lastSnapshotTimestamp!==timestamp) {
       await store.transact(s=>{
@@ -172,7 +172,7 @@ app.post("/api/monitor/settings", (req,res)=>{
   const b=req.body||{};
   settings.pollSeconds=Math.max(10,Math.min(60,Number(b.pollSeconds)||15));
   settings.capital=Math.max(1000,Math.min(100000,Number(b.capital)||10000));
-  settings.riskLimit=Math.max(100,Math.min(2000,Number(b.riskLimit)||2000));
+  settings.riskLimit=Math.max(100,Math.min(2000,settings.capital,Number(b.riskLimit)||2000));
   settings.profitTargetPct=Math.max(5,Math.min(100,Number(b.profitTargetPct)||25));
   settings.lossLimitPct=Math.max(5,Math.min(60,Number(b.lossLimitPct)||30));
   settings.lotSize=Math.max(1,Math.min(1000,Number(b.lotSize)||20));
